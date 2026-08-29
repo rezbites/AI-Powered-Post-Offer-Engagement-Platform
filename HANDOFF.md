@@ -2,10 +2,9 @@
 
 **Deadline: 8:00 PM IST, Sunday 30 August 2026.**
 
-Stages 1–9 are complete and **verified against a running stack**. The README
-(a graded deliverable) is written. Stages 10 and 12 remain, plus three of the
-six diagrams and `docs/decisions.md`. This document is written for whoever (or
-whatever) continues the work.
+Stages 1–9 are complete and **verified against a running stack**, now including
+**Live Mode against real Gemini**. The README (a graded deliverable) is written.
+Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 
 ---
 
@@ -22,6 +21,8 @@ whatever) continues the work.
 | 7 Analytics | ✅ verified | every brief-mandated metric |
 | 8 Frontend | ✅ verified | queue, dashboard, detail, analytics — all render, CORS confirmed |
 | 9 Auth | ✅ verified | login, RBAC 401/403/200, no user enumeration, rate limit 20/min |
+| Live Mode | ✅ verified | real Gemini call: valid, 4.7s, 1019/210 tokens, both signals with exact quotes |
+| Add candidate | ✅ verified | form + `GET /recruiters`; 422 on bad dates, 409 on duplicate email |
 | 10 Eval + tests | ❌ not started | see §4 |
 | 11 Docs | 🟡 **README done**, 2 of 6 diagrams | see §5 |
 | 12 Critical review | ❌ not started | see §6 |
@@ -41,6 +42,21 @@ docker compose exec -T api python -m app.db.seed
 
 Runs with **no API key** — a deterministic mock provider serves everything
 (Demo Mode). Set `GEMINI_API_KEY` for Live Mode.
+
+### ⚠️ API key hygiene
+
+`.env` currently holds a **real Gemini key** and is gitignored — verify with
+`git check-ignore -v .env` before every push. That key was pasted into a chat,
+so treat it as exposed: **rotate it in Google AI Studio** once demoing is done.
+
+`AUTOMATION_ENABLED=false` in `.env` on purpose. With Live Mode on, the hourly
+sweep drafts messages and would spend free-tier quota in the background with
+nobody watching. Turn it back on for the automation demo, or trigger manually
+with `POST /api/v1/automation/run`.
+
+**Free tier is limited.** Each analysis is ~1.2k tokens and takes ~5s. Do not
+run `/ai/analyze-batch` over all 48 active candidates on the live key unless you
+intend to; use Demo Mode (unset the key) for bulk work.
 
 ---
 
@@ -234,6 +250,27 @@ Do not omit these; stating them is worth more than hiding them:
 - Rate limiting is **per-process**; effective limit is `limit × replicas`.
 - In Demo Mode the mock uses **keyword matching**, which cannot handle negation
   ("no relocation issues at all") or paraphrase.
+
+---
+
+## 5b. Live Mode — verified result
+
+One real Gemini call on the relocation candidate:
+
+```
+provider: gemini · model: gemini-2.5-flash · status: valid · 4743 ms
+tokens: 1019 in / 210 out
+RISK: MEDIUM · model proposed: MEDIUM · agreed: True
+SIGNALS:
+  positive_intent      -> "Really looking forward to getting started."
+  relocation_concern   -> "I am still figuring out relocation and accommodation."
+NEXT: Call candidate
+```
+
+Both quotes are exact spans of the candidate's messages, so the grounding
+guardrail passed with zero drops. Note the latency contrast worth mentioning in
+a demo: ~4700 ms live versus ~1 ms mock, which is precisely why the
+`input_hash` cache exists.
 
 ---
 
