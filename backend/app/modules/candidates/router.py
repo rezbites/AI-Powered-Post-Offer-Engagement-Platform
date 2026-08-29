@@ -93,6 +93,15 @@ class RiskOverrideRequest(BaseModel):
 
     risk_level: RiskLevel
     reason: str = Field(min_length=3, max_length=500)
+    confidence: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=1.0,
+        description=(
+            "How certain the recruiter is. Defaults to fully certain, but a "
+            "hedged override is a real and useful state."
+        ),
+    )
 
 
 @router.get("", response_model=Page[CandidateSummary], summary="List and filter candidates")
@@ -169,6 +178,7 @@ async def override_risk(
         candidate_id,
         risk_level=payload.risk_level,
         reason=payload.reason,
+        confidence=payload.confidence,
         actor=actor,
     )
     detailed = await repo.get_candidate_with_detail(session, candidate_id)

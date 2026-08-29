@@ -72,15 +72,6 @@ export default function CandidatePage({
 
       <RiskPanel candidate={data} />
 
-      {data.ai_summary && (
-        <section className="rounded-lg border border-slate-200 bg-white px-5 py-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Summary
-          </h2>
-          <p className="mt-2 text-sm text-slate-700">{data.ai_summary}</p>
-        </section>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-2">
         <JourneyTimeline candidate={data} />
         <Conversation candidate={data} />

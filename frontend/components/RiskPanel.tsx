@@ -26,6 +26,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   const [level, setLevel] = useState<RiskLevel>(candidate.risk.level);
   const [reason, setReason] = useState("");
   const [provider, setProvider] = useState("gemini");
+  const [confidence, setConfidence] = useState(1);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["candidate", candidate.id] });
@@ -34,7 +35,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   };
 
   const override = useMutation({
-    mutationFn: () => api.overrideRisk(candidate.id, level, reason),
+    mutationFn: () => api.overrideRisk(candidate.id, level, reason, confidence),
     onSuccess: () => {
       setOverriding(false);
       setReason("");
@@ -132,7 +133,18 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
 
         {isHuman && risk.override_reason && (
           <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            Reason: “{risk.override_reason}”
+            Reason: “{risk.override_reason}” · stated certainty{" "}
+            {Math.round(risk.confidence * 100)}%
+          </p>
+        )}
+
+        {/* The summary lives here rather than further down the page. It was
+            previously rendered below this panel, where an open override box
+            pushed it off-screen entirely - so a successful analysis looked
+            like nothing had happened. */}
+        {candidate.ai_summary && (
+          <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {candidate.ai_summary}
           </p>
         )}
 
@@ -152,7 +164,17 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
           </ul>
         ) : (
           <p className="mt-2 text-sm text-slate-500">
-            No risk factors detected.
+            {risk.last_analyzed_at
+              ? "Analysed — no risk factors found. This candidate is engaged and on track."
+              : "Not analysed yet. Log a conversation, then run an analysis."}
+          </p>
+        )}
+
+        {risk.signals.length === 0 && risk.last_analyzed_at && (
+          <p className="mt-3 text-xs text-slate-500">
+            {/* Explicit, because silence here is ambiguous: it could mean the
+                analysis failed. It did not - nothing concerning was said. */}
+            No concerns were detected in the candidate&apos;s messages.
           </p>
         )}
 
@@ -225,6 +247,36 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
               A reason is required so this decision is still interpretable weeks
               from now.
             </p>
+
+            <div className="mt-3">
+              <label className="text-xs font-medium text-slate-600">
+                How certain are you?
+              </label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {[
+                  { v: 1, label: "Certain", hint: "I have spoken to them" },
+                  { v: 0.8, label: "Fairly sure", hint: "Strong indication" },
+                  { v: 0.6, label: "A hunch", hint: "Worth flagging, not confirmed" },
+                ].map((c) => (
+                  <button
+                    key={c.v}
+                    title={c.hint}
+                    onClick={() => setConfidence(c.v)}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                      confidence === c.v
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-700"
+                    }`}
+                  >
+                    {c.label} · {Math.round(c.v * 100)}%
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                A hedged override is a real state — it says &ldquo;look again&rdquo;
+                rather than &ldquo;this is settled&rdquo;.
+              </p>
+            </div>
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => override.mutate()}

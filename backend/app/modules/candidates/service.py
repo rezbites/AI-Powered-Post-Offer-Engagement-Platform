@@ -355,6 +355,7 @@ async def override_risk(
     *,
     risk_level: RiskLevel,
     reason: str,
+    confidence: float,
     actor: Actor,
 ) -> Candidate:
     """Replace the AI's risk band with a human judgement.
@@ -377,9 +378,12 @@ async def override_risk(
     candidate.risk_override_reason = reason.strip()
     candidate.risk_overridden_by = actor.id
     candidate.risk_overridden_at = utcnow()
-    # A human override is a definite statement, so confidence is full - the
-    # uncertainty being modelled is the model's, not the recruiter's.
-    candidate.risk_confidence = 1.0
+    # The recruiter states their own certainty. Forcing every override to 1.0
+    # was wrong: a recruiter who thinks someone is probably fine but is not
+    # sure has said something different from one who has just spoken to the
+    # candidate and knows. Flattening both to "certain" throws away the more
+    # useful half of the signal.
+    candidate.risk_confidence = max(0.0, min(1.0, confidence))
 
     await audit.record_change(
         session,

@@ -134,10 +134,15 @@ export const api = {
       { method: "POST" },
     ),
 
-  overrideRisk: (id: string, risk_level: RiskLevel, reason: string) =>
+  overrideRisk: (
+    id: string,
+    risk_level: RiskLevel,
+    reason: string,
+    confidence: number,
+  ) =>
     request<CandidateDetail>(`/candidates/${id}/risk/override`, {
       method: "POST",
-      body: JSON.stringify({ risk_level, reason }),
+      body: JSON.stringify({ risk_level, reason, confidence }),
     }),
 
   revertRisk: (id: string) =>
