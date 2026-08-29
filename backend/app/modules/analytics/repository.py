@@ -268,7 +268,10 @@ async def stage_funnel(session: AsyncSession, *, today: date) -> list[dict[str, 
     for row in rows:
         total = int(row.total or 0)
         completed = int(row.completed or 0)
-        drop_off = 0 if previous_completed is None else max(0, previous_completed - completed)
+        # Everyone who cleared the previous stage but not this one. They are
+        # overwhelmingly still in progress; calling this "drop-off" implies
+        # they left, which is a different and much more alarming claim.
+        not_reached = 0 if previous_completed is None else max(0, previous_completed - completed)
 
         results.append(
             {
@@ -279,7 +282,7 @@ async def stage_funnel(session: AsyncSession, *, today: date) -> list[dict[str, 
                 "pending": int(row.pending or 0),
                 "overdue": int(row.overdue or 0),
                 "completion_rate": round(completed / total * 100, 1) if total else 0.0,
-                "drop_off_from_previous": drop_off,
+                "not_yet_reached": not_reached,
             }
         )
         previous_completed = completed

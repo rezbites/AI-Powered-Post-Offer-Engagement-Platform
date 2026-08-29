@@ -75,9 +75,13 @@ export default function AnalyticsPage() {
       {/* Stage drop-off. This is the metric that justifies storing journey
           progress as per-stage rows rather than a single current_stage column. */}
       <section className="rounded-lg border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold text-slate-900">
-          Engagement funnel
-        </h2>
+        <div className="border-b border-slate-200 px-5 py-3">
+          <h2 className="text-sm font-semibold text-slate-900">Engagement funnel</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Where candidates currently sit. &ldquo;Not here yet&rdquo; means still in
+            progress, not withdrawn &mdash; real withdrawals show in conversion.
+          </p>
+        </div>
         <div className="space-y-3 px-5 py-4">
           {data.stages.map((s) => (
             <div key={s.key}>
@@ -85,9 +89,12 @@ export default function AnalyticsPage() {
                 <span className="text-slate-700">{s.label}</span>
                 <span className="text-slate-500">
                   {s.completed} completed · {s.completion_rate}%
-                  {s.drop_off_from_previous > 0 && (
-                    <span className="ml-2 text-amber-700">
-                      −{s.drop_off_from_previous} dropped off
+                  {s.not_yet_reached > 0 && (
+                    <span
+                      className="ml-2 text-slate-500"
+                      title="Completed the previous step but not this one — mostly still in progress, not withdrawals."
+                    >
+                      {s.not_yet_reached} not here yet
                     </span>
                   )}
                 </span>

@@ -746,6 +746,7 @@ The brief leaves several things open. Each was resolved deliberately:
 
 | Ambiguity | Assumption |
 |---|---|
+| Funnel "drop-off" | Reported as **not yet reached** rather than dropped off. Someone who cleared Welcome but not Documentation is almost always still in progress, not withdrawn. Real withdrawals are the `dropped_out` status and appear in conversion. |
 | "Engagement status" vs "risk level" | Status = journey position (operational). Risk = likelihood of not joining (predictive). Separate columns. |
 | Real email/WhatsApp sending | Simulated, as permitted. The approval gate is real; only delivery is stubbed. |
 | Offer-to-join conversion denominator | **Resolved** candidates only (joined + dropped_out). Including pending would report 13% instead of 67% and mislead. |

@@ -250,7 +250,7 @@ export interface AnalyticsOverview {
     pending: number;
     overdue: number;
     completion_rate: number;
-    drop_off_from_previous: number;
+    not_yet_reached: number;
   }[];
   recruiters: {
     recruiter_id: string;

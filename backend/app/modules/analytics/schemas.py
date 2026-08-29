@@ -102,8 +102,12 @@ class StageMetrics(BaseModel):
     pending: int
     overdue: int = Field(description="Pending and past the stage SLA.")
     completion_rate: float
-    drop_off_from_previous: int = Field(
-        description="Candidates who completed the previous stage but not this one."
+    not_yet_reached: int = Field(
+        description=(
+            "Completed the previous stage but not this one. Mostly candidates "
+            "still in progress - NOT people who withdrew. Actual withdrawals "
+            "are the dropped_out status, counted in conversion."
+        )
     )
 
 
