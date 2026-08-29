@@ -86,7 +86,7 @@ def build_context(
     unanswered_outbound: int,
     interaction_totals: tuple[int, int],
     analysis: AIAnalysisRecord | None,
-    has_open_follow_up: bool,
+    open_follow_up_rules: frozenset[str] = frozenset(),
 ) -> CandidateContext:
     """Assemble the pure snapshot every decision function consumes."""
     total, inbound = interaction_totals
@@ -104,7 +104,7 @@ def build_context(
         stages_completed=int(stage_stats.get("completed", 0) or 0),
         stages_overdue=int(stage_stats.get("overdue", 0) or 0),
         signals=_signals_from_analysis(analysis),
-        has_open_follow_up=has_open_follow_up,
+        open_follow_up_rules=open_follow_up_rules,
     )
 
 
@@ -427,7 +427,7 @@ async def assemble_summaries(
     analyses = await repo.latest_analyses_for(session, ids)
     unanswered = await repo.unanswered_outbound_counts(session, ids)
     totals = await repo.interaction_counts(session, ids)
-    open_follow_ups = await repo.open_follow_up_ids(session, ids)
+    open_follow_ups = await repo.open_follow_up_rules(session, ids)
 
     summaries: list[CandidateSummary] = []
     for candidate in candidates:
@@ -438,7 +438,7 @@ async def assemble_summaries(
             unanswered_outbound=unanswered.get(candidate.id, 0),
             interaction_totals=totals.get(candidate.id, (0, 0)),
             analysis=analysis,
-            has_open_follow_up=candidate.id in open_follow_ups,
+            open_follow_up_rules=open_follow_ups.get(candidate.id, frozenset()),
         )
         summaries.append(
             to_summary(
@@ -464,7 +464,7 @@ async def assemble_detail(
     analyses = await repo.latest_analyses_for(session, ids)
     unanswered = await repo.unanswered_outbound_counts(session, ids)
     totals = await repo.interaction_counts(session, ids)
-    open_follow_ups = await repo.open_follow_up_ids(session, ids)
+    open_follow_ups = await repo.open_follow_up_rules(session, ids)
 
     analysis = analyses.get(candidate.id)
     context = build_context(
@@ -473,7 +473,7 @@ async def assemble_detail(
         unanswered_outbound=unanswered.get(candidate.id, 0),
         interaction_totals=totals.get(candidate.id, (0, 0)),
         analysis=analysis,
-        has_open_follow_up=candidate.id in open_follow_ups,
+        open_follow_up_rules=open_follow_ups.get(candidate.id, frozenset()),
     )
 
     return to_detail(

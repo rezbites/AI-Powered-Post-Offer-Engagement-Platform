@@ -95,6 +95,30 @@ class TestHighRiskUnattended:
         ctx = make_context(days_to_joining=60, days_since_interaction=1)
         assert self.rule.predicate(ctx, today) is False
 
+    def test_a_paperwork_reminder_does_not_silence_an_escalation(self, today):
+        """Regression. Suppressing on *any* open follow-up made this rule dead
+        code: `stage_overdue` fires for most candidates, so a routine document
+        nag would silence the escalation for someone about to walk.
+        """
+        ctx = make_context(
+            days_to_joining=3,
+            days_since_interaction=12,
+            stages_overdue=2,
+            open_follow_up_rules=frozenset({"stage_overdue"}),
+        )
+        assert self.rule.predicate(ctx, today) is True
+
+    def test_an_urgent_contact_task_does_silence_an_escalation(self, today):
+        """The converse: if someone is already tasked with calling this
+        candidate today, a second escalation adds noise, not value."""
+        ctx = make_context(
+            days_to_joining=3,
+            days_since_interaction=12,
+            stages_overdue=2,
+            open_follow_up_rules=frozenset({"joining_soon_no_contact"}),
+        )
+        assert self.rule.predicate(ctx, today) is False
+
 
 class TestRelocationSupport:
     rule = RULES_BY_KEY["relocation_support"]

@@ -95,6 +95,16 @@ def build_message_prompt(snapshot: CandidateSnapshot, *, channel: str) -> str:
     return template.replace("{snapshot_json}", payload).replace("{channel}", channel)
 
 
+def _elapsed_ms(started: float) -> int:
+    """Milliseconds since `started`, floored at 1.
+
+    The column is an integer, and truncating a sub-millisecond mock call to
+    a bare 0 makes "very fast" indistinguishable from "never measured" in
+    the ledger. One millisecond is an honest floor.
+    """
+    return max(1, round((time.perf_counter() - started) * 1000))
+
+
 def _strip_fences(text: str) -> str:
     """Remove markdown fences a model may add despite instructions.
 
@@ -228,7 +238,7 @@ async def analyse(
             status=AnalysisStatus.VALID,
             provider=result.provider,
             model=result.model,
-            latency_ms=int((time.perf_counter() - started) * 1000),
+            latency_ms=_elapsed_ms(started),
             tokens_in=total_tokens_in or None,
             tokens_out=total_tokens_out or None,
             raw_response=raw_text,
@@ -248,7 +258,7 @@ async def analyse(
             status=AnalysisStatus.FAILED,
             provider=provider.name,
             model=None,
-            latency_ms=int((time.perf_counter() - started) * 1000),
+            latency_ms=_elapsed_ms(started),
             tokens_in=total_tokens_in or None,
             tokens_out=total_tokens_out or None,
             raw_response=None,
@@ -279,7 +289,7 @@ async def analyse(
             status=AnalysisStatus.REPAIRED,
             provider=repair.provider,
             model=repair.model,
-            latency_ms=int((time.perf_counter() - started) * 1000),
+            latency_ms=_elapsed_ms(started),
             tokens_in=total_tokens_in or None,
             tokens_out=total_tokens_out or None,
             raw_response=repair.text,
@@ -300,7 +310,7 @@ async def analyse(
         status=AnalysisStatus.FAILED,
         provider=provider.name,
         model=None,
-        latency_ms=int((time.perf_counter() - started) * 1000),
+        latency_ms=_elapsed_ms(started),
         tokens_in=total_tokens_in or None,
         tokens_out=total_tokens_out or None,
         raw_response=raw_text,

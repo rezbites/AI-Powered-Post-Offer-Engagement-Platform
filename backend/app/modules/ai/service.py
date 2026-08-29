@@ -52,7 +52,7 @@ async def _load_context_and_snapshot(
     next_labels = await repo.next_pending_stage_labels(session, ids)
     unanswered = await repo.unanswered_outbound_counts(session, ids)
     totals = await repo.interaction_counts(session, ids)
-    open_follow_ups = await repo.open_follow_up_ids(session, ids)
+    open_follow_ups = await repo.open_follow_up_rules(session, ids)
     stats = stage_stats.get(candidate_id, {})
 
     context = candidate_service.build_context(
@@ -61,7 +61,7 @@ async def _load_context_and_snapshot(
         unanswered_outbound=unanswered.get(candidate_id, 0),
         interaction_totals=totals.get(candidate_id, (0, 0)),
         analysis=None,  # signals come from this run, not a previous one
-        has_open_follow_up=candidate_id in open_follow_ups,
+        open_follow_up_rules=open_follow_ups.get(candidate_id, frozenset()),
     )
 
     snapshot = build_snapshot(

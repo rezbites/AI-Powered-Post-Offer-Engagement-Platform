@@ -307,24 +307,34 @@ async def interaction_counts(session: AsyncSession, candidate_ids: list[str]) ->
     return {cid: (int(total or 0), int(inbound or 0)) for cid, total, inbound in (await session.execute(stmt)).all()}
 
 
-async def open_follow_up_ids(session: AsyncSession, candidate_ids: list[str]) -> set[str]:
-    """Candidates that already have an unresolved follow-up.
+async def open_follow_up_rules(
+    session: AsyncSession, candidate_ids: list[str]
+) -> dict[str, frozenset[str]]:
+    """Which rules have an unresolved follow-up, per candidate.
 
-    Used to avoid stacking duplicate escalations on someone a recruiter is
-    already working.
+    Returns rule keys rather than a bare "has any" flag so predicates can be
+    specific: a stage-overdue reminder should not suppress a high-risk
+    escalation, and a boolean cannot express that distinction.
+
+    Human-created follow-ups have a NULL rule_key; they map to the sentinel
+    "manual" so they still count as work in progress.
     """
     if not candidate_ids:
-        return set()
+        return {}
 
     stmt = (
-        select(FollowUpAction.candidate_id)
+        select(FollowUpAction.candidate_id, FollowUpAction.rule_key)
         .where(
             FollowUpAction.candidate_id.in_(candidate_ids),
             FollowUpAction.status == FollowUpStatus.OPEN.value,
         )
         .distinct()
     )
-    return {row[0] for row in (await session.execute(stmt)).all()}
+
+    grouped: dict[str, set[str]] = {}
+    for candidate_id, rule_key in (await session.execute(stmt)).all():
+        grouped.setdefault(candidate_id, set()).add(rule_key or "manual")
+    return {cid: frozenset(keys) for cid, keys in grouped.items()}
 
 
 async def email_exists(session: AsyncSession, email: str, *, exclude_id: str | None = None) -> bool:

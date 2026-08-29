@@ -38,6 +38,7 @@ def make_context(
     stages_completed: int = 3,
     stages_overdue: int = 0,
     signals: list[tuple[SignalType, str]] | None = None,
+    open_follow_up_rules: frozenset[str] | None = None,
     has_open_follow_up: bool = False,
 ) -> CandidateContext:
     """Build a context from human-meaningful parameters.
@@ -61,7 +62,13 @@ def make_context(
         stages_completed=stages_completed,
         stages_overdue=stages_overdue,
         signals=[SignalView(type=t, evidence=e) for t, e in (signals or [])],
-        has_open_follow_up=has_open_follow_up,
+        # `has_open_follow_up=True` is shorthand for 'some generic follow-up
+        # exists'; pass `open_follow_up_rules` when the specific rule matters.
+        open_follow_up_rules=(
+            open_follow_up_rules
+            if open_follow_up_rules is not None
+            else (frozenset({'manual'}) if has_open_follow_up else frozenset())
+        ),
     )
 
 

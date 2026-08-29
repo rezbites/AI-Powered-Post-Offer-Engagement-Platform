@@ -44,7 +44,11 @@ class CandidateContext:
     stages_completed: int
     stages_overdue: int
     signals: list[SignalView] = field(default_factory=list)
-    has_open_follow_up: bool = False
+    # Which rules already have an unresolved follow-up for this candidate.
+    # Deliberately not a bare boolean: a low-priority paperwork reminder must
+    # not suppress a high-risk escalation, so predicates need to ask about
+    # the specific rules they care about.
+    open_follow_up_rules: frozenset[str] = frozenset()
 
     # --- Derived time quantities -----------------------------------------
     def days_to_joining(self, today: date) -> int:
@@ -64,6 +68,16 @@ class CandidateContext:
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         return (today - last.date()).days
+
+    @property
+    def has_open_follow_up(self) -> bool:
+        """Whether any follow-up is open. Used for attention-queue ranking,
+        where any in-flight work is a reason to rank a candidate lower."""
+        return bool(self.open_follow_up_rules)
+
+    def has_open_follow_up_from(self, rule_keys: frozenset[str]) -> bool:
+        """Whether a follow-up from one of these specific rules is open."""
+        return bool(self.open_follow_up_rules & rule_keys)
 
     @property
     def is_terminal(self) -> bool:

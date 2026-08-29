@@ -18,7 +18,7 @@ from datetime import date
 from typing import Callable
 
 from app.domain.context import CandidateContext
-from app.domain.enums import NextAction, RiskLevel
+from app.domain.enums import NextAction, RiskLevel, SignalType
 from app.domain.risk import (
     JOINING_IMMINENT_DAYS,
     SILENCE_THRESHOLD_DAYS,
@@ -107,8 +107,18 @@ def _build_stage_overdue(ctx: CandidateContext, today: date) -> RuleOutcome:
 # --------------------------------------------------------------------------
 # Rule 3 - high risk with nobody working it.
 # --------------------------------------------------------------------------
+# Only follow-ups that actually address joining risk suppress an escalation.
+# Checking "any open follow-up" was a real bug: a routine paperwork reminder
+# from `stage_overdue` would silence the escalation for a candidate about to
+# walk, and because that rule fires for most candidates the escalation became
+# effectively dead code.
+SUPPRESSES_ESCALATION = frozenset(
+    {"joining_soon_no_contact", "high_risk_unattended", "manual"}
+)
+
+
 def _high_risk_unattended(ctx: CandidateContext, today: date) -> bool:
-    if ctx.is_terminal or ctx.has_open_follow_up:
+    if ctx.is_terminal or ctx.has_open_follow_up_from(SUPPRESSES_ESCALATION):
         return False
     return classify(score(ctx, today=today)) is RiskLevel.HIGH
 
@@ -129,11 +139,14 @@ def _build_high_risk(ctx: CandidateContext, today: date) -> RuleOutcome:
 # Distinct from the generic high-risk escalation because relocation support is
 # a concrete offer a recruiter can make today.
 # --------------------------------------------------------------------------
-def _relocation_support_needed(ctx: CandidateContext, today: date) -> bool:
-    if ctx.is_terminal or ctx.has_open_follow_up:
-        return False
-    from app.domain.enums import SignalType
+# A relocation offer is specific enough that only a prior relocation offer
+# (or a human already handling it) should suppress it.
+SUPPRESSES_RELOCATION = frozenset({"relocation_support", "manual"})
 
+
+def _relocation_support_needed(ctx: CandidateContext, today: date) -> bool:
+    if ctx.is_terminal or ctx.has_open_follow_up_from(SUPPRESSES_RELOCATION):
+        return False
     return any(s.type is SignalType.RELOCATION_CONCERN for s in ctx.signals)
 
 

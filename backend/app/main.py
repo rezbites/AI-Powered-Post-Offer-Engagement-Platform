@@ -14,7 +14,10 @@ from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.db.session import engine
 from app.modules.ai.router import router as ai_router
+from app.modules.analytics.router import router as analytics_router
 from app.modules.attention.router import router as attention_router
+from app.modules.automation.router import router as automation_router
+from app.modules.automation.scheduler import start_scheduler, stop_scheduler
 from app.modules.candidates.router import router as candidates_router
 from app.modules.engagement.router import router as engagement_router
 from app.modules.health.router import router as health_router
@@ -41,8 +44,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         database="sqlite" if settings.is_sqlite else "postgres",
     )
 
+    # Started after logging so scheduler output is formatted consistently.
+    # Failure here must not prevent the app serving requests: automation is
+    # important, but a recruiter still needs the dashboard without it.
+    try:
+        start_scheduler()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("scheduler_start_failed", error=str(exc), exc_info=True)
+
     yield
 
+    stop_scheduler()
     await engine.dispose()
     logger.info("application_stopped")
 
@@ -76,7 +88,9 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router, prefix=settings.api_prefix)
     app.include_router(ai_router, prefix=settings.api_prefix)
+    app.include_router(analytics_router, prefix=settings.api_prefix)
     app.include_router(attention_router, prefix=settings.api_prefix)
+    app.include_router(automation_router, prefix=settings.api_prefix)
     app.include_router(candidates_router, prefix=settings.api_prefix)
     # Registered after candidates so the more specific /candidates/{id}/...
     # routes do not shadow the candidate detail route.

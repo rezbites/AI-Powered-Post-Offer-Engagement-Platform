@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 QUEUE_HORIZON_DAYS = 120
 
 
-async def _active_candidates(session: AsyncSession, *, today: date) -> list[Candidate]:
+async def active_candidates(session: AsyncSession, *, today: date) -> list[Candidate]:
     """Non-terminal candidates within the planning horizon."""
     horizon = today + timedelta(days=QUEUE_HORIZON_DAYS)
     stmt = (
@@ -53,7 +53,7 @@ async def _active_candidates(session: AsyncSession, *, today: date) -> list[Cand
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def _contexts_for(
+async def contexts_for(
     session: AsyncSession, candidates: list[Candidate], *, today: date
 ) -> dict[str, CandidateContext]:
     """Build pure contexts for a set of candidates, batching every lookup."""
@@ -65,7 +65,7 @@ async def _contexts_for(
     analyses = await repo.latest_analyses_for(session, ids)
     unanswered = await repo.unanswered_outbound_counts(session, ids)
     totals = await repo.interaction_counts(session, ids)
-    open_follow_ups = await repo.open_follow_up_ids(session, ids)
+    open_follow_ups = await repo.open_follow_up_rules(session, ids)
 
     return {
         c.id: candidate_service.build_context(
@@ -74,7 +74,7 @@ async def _contexts_for(
             unanswered_outbound=unanswered.get(c.id, 0),
             interaction_totals=totals.get(c.id, (0, 0)),
             analysis=analyses.get(c.id),
-            has_open_follow_up=c.id in open_follow_ups,
+            open_follow_up_rules=open_follow_ups.get(c.id, frozenset()),
         )
         for c in candidates
     }
@@ -90,11 +90,11 @@ async def build_attention_queue(
     from async code raises MissingGreenlet. Passing it through also reuses the
     batched lookup instead of issuing a query per row.
     """
-    candidates = await _active_candidates(session, today=today)
+    candidates = await active_candidates(session, today=today)
     if recruiter_id:
         candidates = [c for c in candidates if c.recruiter_id == recruiter_id]
 
-    contexts = await _contexts_for(session, candidates, today=today)
+    contexts = await contexts_for(session, candidates, today=today)
     analyses = await repo.latest_analyses_for(session, [c.id for c in candidates])
     by_id = {c.id: c for c in candidates}
 
@@ -124,8 +124,8 @@ async def recompute_risk(
     So this only (re)writes rows whose risk is rule-derived, which is exactly
     the set that goes stale purely through the passage of time.
     """
-    candidates = await _active_candidates(session, today=today)
-    contexts = await _contexts_for(session, candidates, today=today)
+    candidates = await active_candidates(session, today=today)
+    contexts = await contexts_for(session, candidates, today=today)
 
     updated = 0
     skipped = 0
