@@ -148,6 +148,7 @@ class ProviderName(str, Enum):
     mistaken for genuine model output."""
 
     GEMINI = "gemini"
+    CLAUDE = "claude"
     MOCK = "mock"
 
 

@@ -25,6 +25,7 @@ Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 | Add candidate | ✅ verified | form + `GET /recruiters`; 422 on bad dates, 409 on duplicate email |
 | Log interaction | ✅ verified | inline form on the detail page; back-dating supported |
 | Edit draft | ✅ verified | `PATCH /ai/messages/{id}`; drafts only, marked `human_edited` |
+| Claude provider | ✅ verified | third provider via the port; full eval, 0 failures |
 | Provider toggle | ✅ verified | per-call `?provider=gemini\|mock` on analyse and draft; UI toggle on both panels |
 | 10 Eval harness | ✅ done | 22-scenario golden set, `make eval`; mock scored |
 | 10 Integration tests | ❌ not started | see §4b |
@@ -145,7 +146,25 @@ sure the README's statement of this stays accurate (it currently says so in
 `backend/evals/run_eval.py`. Run with `make eval` (mock, free) or
 `make eval-live` (compares both providers — **see the quota warning**).
 
-**Mock baseline, 22 scenarios:**
+**Head-to-head, 22 scenarios (both runs valid, 0 failures):**
+
+```
+  metric                          mock        claude
+  schema_validity_pct           100.00        100.00
+  band_exact_pct                 72.73         72.73
+  signal_precision                0.88          0.75
+  signal_recall                   0.94          0.94
+  signal_f1                       0.91          0.83
+  grounding_drops                 0.00          0.00
+  latency_p50_ms                  1.00       3900.00
+```
+
+Claude Haiku matching the mock's 0.94 recall is what confirms the earlier
+Gemini figure (0.44) was a quota artefact rather than a model or prompt
+problem. Claude's lower precision is real though: it over-reports
+`low_enthusiasm` and `positive_intent` on thin evidence.
+
+**Mock baseline detail:**
 
 ```
 schema valid first pass  100.0%      band exact          72.7%

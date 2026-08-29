@@ -301,8 +301,15 @@ def print_misses(report: Report) -> None:
 
 async def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate AI extraction quality.")
-    parser.add_argument("--provider", default="mock", choices=["mock", "gemini"])
-    parser.add_argument("--compare", action="store_true", help="Run both providers.")
+    parser.add_argument(
+        "--provider", default="mock", choices=["mock", "gemini", "claude"]
+    )
+    parser.add_argument(
+        "--compare",
+        nargs="*",
+        metavar="PROVIDER",
+        help="Compare providers, e.g. --compare mock claude. Defaults to all available.",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--json", action="store_true", help="Emit JSON for CI.")
     parser.add_argument(
@@ -316,7 +323,16 @@ async def main() -> int:
     )
     args = parser.parse_args()
 
-    providers = ["mock", "gemini"] if args.compare else [args.provider]
+    if args.compare is not None:
+        # Bare --compare means every provider this deployment can honour,
+        # so a missing key silently drops out rather than skewing the table.
+        from app.ai.factory import available_providers
+
+        providers = args.compare or [
+            name for name, ok in available_providers().items() if ok
+        ]
+    else:
+        providers = [args.provider]
     reports = []
 
     for name in providers:
@@ -331,13 +347,25 @@ async def main() -> int:
         print_report(report)
         print_misses(report)
 
-    if args.compare and len(reports) == 2:
-        a, b = reports[0].summary(), reports[1].summary()
-        print("=" * 68)
-        print(f"  {'metric':<28}{reports[0].provider:>18}{reports[1].provider:>18}")
-        print("-" * 68)
-        for key in ("band_exact_pct", "signal_recall", "signal_f1", "latency_p50_ms"):
-            print(f"  {key:<28}{a[key]:>18.2f}{b[key]:>18.2f}")
+    if len(reports) > 1:
+        width = 68 + 14 * (len(reports) - 2)
+        print("=" * width)
+        header = f"  {'metric':<28}" + "".join(f"{r.provider:>14}" for r in reports)
+        print(header)
+        print("-" * width)
+        summaries = [r.summary() for r in reports]
+        for key in (
+            "schema_validity_pct",
+            "band_exact_pct",
+            "signal_precision",
+            "signal_recall",
+            "signal_f1",
+            "grounding_drops",
+            "failed",
+            "latency_p50_ms",
+        ):
+            row = f"  {key:<28}" + "".join(f"{s[key]:>14.2f}" for s in summaries)
+            print(row)
         print()
 
     # Non-zero exit if anything failed outright or an injection leaked, so this

@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ProviderName = Literal["auto", "gemini", "mock"]
+ProviderName = Literal["auto", "gemini", "claude", "mock"]
 
 INSECURE_DEFAULT_SECRET = "dev-only-insecure-secret-change-me"
 
@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     llm_provider: ProviderName = "auto"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5-20251001"
     llm_timeout_seconds: float = 20.0
     llm_max_output_tokens: int = 2048
 
@@ -81,21 +83,32 @@ class Settings(BaseSettings):
         return self.database_url.startswith("sqlite")
 
     @property
-    def resolved_provider(self) -> Literal["gemini", "mock"]:
+    def resolved_provider(self) -> Literal["gemini", "claude", "mock"]:
         """Which LLM provider will actually serve requests.
 
-        Deliberately falls back to the mock rather than raising: a missing API
-        key should degrade the system to Demo Mode, not prevent it booting.
+        Under "auto", Gemini wins when both keys are present - it is the
+        provider the prompts were tuned against. Falling back to the mock
+        rather than raising is deliberate: a missing key should degrade the
+        system to Demo Mode, not stop it booting.
         """
-        if self.llm_provider == "gemini":
+        if self.llm_provider in ("gemini", "claude", "mock"):
+            return self.llm_provider  # type: ignore[return-value]
+        if self.gemini_api_key.strip():
             return "gemini"
-        if self.llm_provider == "mock":
-            return "mock"
-        return "gemini" if self.gemini_api_key.strip() else "mock"
+        if self.anthropic_api_key.strip():
+            return "claude"
+        return "mock"
 
     @property
     def is_demo_mode(self) -> bool:
         return self.resolved_provider == "mock"
+
+    @property
+    def active_model(self) -> str | None:
+        """Model name for the resolved provider, or None in Demo Mode."""
+        return {"gemini": self.gemini_model, "claude": self.anthropic_model}.get(
+            self.resolved_provider
+        )
 
     def validate_production_safety(self) -> list[str]:
         """Configuration that is fine locally but unacceptable in production.

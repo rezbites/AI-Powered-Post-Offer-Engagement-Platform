@@ -52,7 +52,7 @@ async def health_ready(response: Response) -> dict[str, object]:
         # Named explicitly so nobody has to guess whether analyses are real.
         "provider": settings.resolved_provider,
         "mode": "demo" if settings.is_demo_mode else "live",
-        "model": None if settings.is_demo_mode else settings.gemini_model,
+        "model": settings.active_model,
     }
 
 

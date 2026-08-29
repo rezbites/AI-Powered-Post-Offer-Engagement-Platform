@@ -324,7 +324,7 @@ async def ai_status() -> dict[str, object]:
     return {
         "provider": settings.resolved_provider,
         "mode": "demo" if demo else "live",
-        "model": None if demo else settings.gemini_model,
+        "model": settings.active_model,
         "prompt_version": service.pipeline.PROMPT_VERSION,
         # Lets the UI offer a provider choice only when it can be honoured.
         "available": available_providers(),
@@ -332,6 +332,6 @@ async def ai_status() -> dict[str, object]:
             "Demo Mode - analyses are produced by a deterministic mock provider. "
             "No LLM calls are made. Set GEMINI_API_KEY to enable Live Mode."
             if demo
-            else f"Live Mode - analyses are produced by {settings.gemini_model}."
+            else f"Live Mode - analyses are produced by {settings.active_model}."
         ),
     }
