@@ -54,6 +54,57 @@ def get_provider() -> AIProvider:
     return MockProvider()
 
 
+@lru_cache
+def _gemini_provider() -> AIProvider | None:
+    """Build the Gemini provider once, or None if it cannot be constructed."""
+    settings = get_settings()
+    if not settings.gemini_api_key.strip():
+        return None
+    try:
+        from app.ai.gemini import GeminiProvider
+
+        return GeminiProvider()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("gemini_init_failed", error=str(exc))
+        return None
+
+
+def available_providers() -> dict[str, bool]:
+    """Which providers this deployment can actually use.
+
+    The UI reads this to decide whether to offer a Gemini option at all -
+    presenting a choice that will silently fall back to the mock would be worse
+    than not offering it.
+    """
+    return {"mock": True, "gemini": _gemini_provider() is not None}
+
+
+def get_provider_by_name(name: str | None) -> tuple[AIProvider, bool]:
+    """Resolve an explicitly requested provider.
+
+    Returns `(provider, honoured)`. `honoured` is False when the caller asked
+    for Gemini and no key is configured, so the caller can *tell the user* the
+    request was downgraded rather than quietly serving mock output labelled as
+    a live analysis. Silent substitution is exactly the dishonesty the Demo
+    Mode labelling exists to prevent.
+    """
+    if name is None:
+        return get_provider(), True
+
+    if name == "mock":
+        return MockProvider(), True
+
+    if name == "gemini":
+        gemini = _gemini_provider()
+        if gemini is None:
+            logger.warning("gemini_requested_but_unavailable")
+            return MockProvider(), False
+        return gemini, True
+
+    return get_provider(), True
+
+
 def reset_provider_cache() -> None:
     """Clear the cached provider. Used by tests that swap configuration."""
     get_provider.cache_clear()
+    _gemini_provider.cache_clear()

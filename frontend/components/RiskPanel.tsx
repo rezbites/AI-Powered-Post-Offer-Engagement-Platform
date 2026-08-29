@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { ProviderToggle } from "./ProviderToggle";
 import { RiskBadge } from "./RiskBadge";
 import type { CandidateDetail, RiskLevel } from "@/types/api";
 
@@ -24,6 +25,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   const [overriding, setOverriding] = useState(false);
   const [level, setLevel] = useState<RiskLevel>(candidate.risk.level);
   const [reason, setReason] = useState("");
+  const [provider, setProvider] = useState("gemini");
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["candidate", candidate.id] });
@@ -46,7 +48,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   });
 
   const analyze = useMutation({
-    mutationFn: () => api.analyze(candidate.id, true),
+    mutationFn: () => api.analyze(candidate.id, true, provider),
     onSuccess: invalidate,
   });
 
@@ -71,7 +73,8 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ProviderToggle value={provider} onChange={setProvider} />
           <button
             onClick={() => analyze.mutate()}
             disabled={analyze.isPending}

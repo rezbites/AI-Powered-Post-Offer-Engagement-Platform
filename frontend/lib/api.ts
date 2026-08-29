@@ -128,9 +128,9 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  analyze: (id: string, force = false) =>
+  analyze: (id: string, force = false, provider?: string) =>
     request<AnalysisResponse>(
-      `/candidates/${id}/ai/analyze?force=${force}`,
+      `/candidates/${id}/ai/analyze${queryString({ force, provider })}`,
       { method: "POST" },
     ),
 
@@ -145,9 +145,9 @@ export const api = {
       method: "POST",
     }),
 
-  draftMessage: (id: string, channel: "email" | "whatsapp") =>
+  draftMessage: (id: string, channel: "email" | "whatsapp", provider?: string) =>
     request<GeneratedMessage>(
-      `/candidates/${id}/ai/message?channel=${channel}`,
+      `/candidates/${id}/ai/message${queryString({ channel, provider })}`,
       { method: "POST" },
     ),
 

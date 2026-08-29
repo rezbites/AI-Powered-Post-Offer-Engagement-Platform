@@ -18,6 +18,7 @@ from app.domain.enums import (
     NextAction,
     RiskLevel,
 )
+from app.ai.factory import available_providers
 from app.modules.ai import service
 from app.modules.candidates.schemas import SignalOut
 
@@ -143,6 +144,10 @@ async def analyze_candidate(
     actor: ActorDep,
     candidate_id: str,
     force: Annotated[bool, Query(description="Bypass the cache and re-analyse.")] = False,
+    provider: Annotated[
+        str | None,
+        Query(description="Force a provider for this call: 'gemini' or 'mock'."),
+    ] = None,
 ) -> AnalysisResponse:
     """Runs snapshot -> cache -> generate -> validate -> repair -> fallback.
 
@@ -151,7 +156,7 @@ async def analyze_candidate(
     breaks when the model is down would be worse than one that degrades.
     """
     record, from_cache = await service.analyse_candidate(
-        session, candidate_id, actor=actor, force=force
+        session, candidate_id, actor=actor, force=force, provider_name=provider
     )
     return _to_analysis_response(record, from_cache=from_cache)
 
@@ -190,10 +195,11 @@ async def draft_message(
     actor: ActorDep,
     candidate_id: str,
     channel: Annotated[InteractionChannel, Query()] = InteractionChannel.EMAIL,
+    provider: Annotated[str | None, Query(description="'gemini' or 'mock'.")] = None,
 ) -> MessageResponse:
     """Generates a draft. Nothing is sent until a recruiter approves it."""
     message, warnings = await service.generate_message(
-        session, candidate_id, channel=channel, actor=actor
+        session, candidate_id, channel=channel, actor=actor, provider_name=provider
     )
     return MessageResponse(
         id=message.id,
@@ -320,6 +326,8 @@ async def ai_status() -> dict[str, object]:
         "mode": "demo" if demo else "live",
         "model": None if demo else settings.gemini_model,
         "prompt_version": service.pipeline.PROMPT_VERSION,
+        # Lets the UI offer a provider choice only when it can be honoured.
+        "available": available_providers(),
         "description": (
             "Demo Mode - analyses are produced by a deterministic mock provider. "
             "No LLM calls are made. Set GEMINI_API_KEY to enable Live Mode."

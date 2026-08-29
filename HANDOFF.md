@@ -25,6 +25,7 @@ Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 | Add candidate | ✅ verified | form + `GET /recruiters`; 422 on bad dates, 409 on duplicate email |
 | Log interaction | ✅ verified | inline form on the detail page; back-dating supported |
 | Edit draft | ✅ verified | `PATCH /ai/messages/{id}`; drafts only, marked `human_edited` |
+| Provider toggle | ✅ verified | per-call `?provider=gemini\|mock` on analyse and draft; UI toggle on both panels |
 | 10 Eval + tests | ❌ not started | see §4 |
 | 11 Docs | 🟡 **README done**, 2 of 6 diagrams | see §5 |
 | 12 Critical review | ❌ not started | see §6 |
@@ -295,6 +296,28 @@ one sentence**, both with exact quotes. And confidence fell to 0.40 *because*
 the model and the engine disagreed on the band — that is the derived-confidence
 mechanism doing precisely what it was built for, and it is only visible because
 both numbers are stored.
+
+---
+
+## 5d. Provider toggle — the side-by-side
+
+Same candidate, same inbound message (*"I have another offer in hand and the
+pay there is a bit higher"*), run through both providers:
+
+```
+mock       1 ms   HIGH conf 0.40  model said MEDIUM  agreed False
+                  [competing_offer, low_enthusiasm]
+gemini  5380 ms   HIGH conf 0.40  model said HIGH    agreed True
+                  [competing_offer, compensation_concern, low_enthusiasm]
+```
+
+Gemini extracted **compensation_concern** from "the pay there is a bit higher";
+the keyword matcher had no rule for it. This is the clearest demonstration in
+the project of *why* the provider port exists — and the mock is still good
+enough that the product is fully usable without a key.
+
+Note the toggle deliberately bypasses the analysis cache: asking for Gemini and
+receiving a cached mock result would defeat the point.
 
 ---
 

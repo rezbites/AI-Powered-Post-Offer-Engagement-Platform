@@ -183,6 +183,8 @@ export interface AIStatus {
   model: string | null;
   prompt_version: string;
   description: string;
+  /** Which providers this deployment can actually honour. */
+  available: { mock: boolean; gemini: boolean };
 }
 
 export interface FollowUp {

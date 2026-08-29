@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { ProviderToggle } from "./ProviderToggle";
 import type { GeneratedMessage } from "@/types/api";
 
 /**
@@ -21,6 +22,7 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftSubject, setDraftSubject] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState("");
+  const [provider, setProvider] = useState("gemini");
 
   const { data: messages } = useQuery({
     queryKey: ["messages", candidateId],
@@ -29,7 +31,7 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
 
   const draft = useMutation({
     mutationFn: (channel: "email" | "whatsapp") =>
-      api.draftMessage(candidateId, channel),
+      api.draftMessage(candidateId, channel, provider),
     onSuccess: (msg: GeneratedMessage) => {
       setWarnings(msg.warnings ?? []);
       qc.invalidateQueries({ queryKey: ["messages", candidateId] });
@@ -53,7 +55,8 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
     <section className="rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 className="text-sm font-semibold text-slate-900">Messages</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ProviderToggle value={provider} onChange={setProvider} />
           <button
             onClick={() => draft.mutate("email")}
             disabled={draft.isPending}

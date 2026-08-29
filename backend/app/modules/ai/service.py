@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ai import pipeline
-from app.ai.factory import get_provider
+from app.ai.factory import get_provider, get_provider_by_name
 from app.ai.provider import ProviderUnavailable
 from app.ai.snapshot import CandidateSnapshot, build_snapshot
 from app.core.deps import Actor
@@ -168,6 +168,7 @@ async def analyse_candidate(
     actor: Actor,
     today: date | None = None,
     force: bool = False,
+    provider_name: str | None = None,
 ) -> tuple[AIAnalysisRecord, bool]:
     """Analyse one candidate. Returns the record and whether it came from cache.
 
@@ -180,14 +181,18 @@ async def analyse_candidate(
     )
     input_hash = snapshot.input_hash()
 
-    if not force:
+    # An explicit provider choice always runs fresh: the point of asking for
+    # Gemini is to see Gemini, not a cached mock result for the same state.
+    if not force and provider_name is None:
         cached = await _cached_analysis(session, candidate_id, input_hash)
         if cached is not None:
             logger.info("analysis_cache_hit", candidate_id=candidate_id)
             return cached, True
 
-    provider = get_provider()
+    provider, honoured = get_provider_by_name(provider_name)
     outcome = await pipeline.analyse(provider, snapshot, context, today=today)
+    if not honoured:
+        logger.warning("provider_downgraded", requested=provider_name, served=provider.name.value)
 
     # Blend first: the row must store the band the product will display,
     # not the model's unreviewed proposal.
@@ -287,6 +292,7 @@ async def generate_message(
     channel: InteractionChannel,
     actor: Actor,
     today: date | None = None,
+    provider_name: str | None = None,
 ) -> tuple[GeneratedMessage, list[str]]:
     """Draft a message for recruiter review.
 
@@ -299,9 +305,9 @@ async def generate_message(
         session, candidate_id, today=today
     )
 
-    provider = get_provider()
+    provider, _honoured = get_provider_by_name(provider_name)
     try:
-        draft, warnings, provider_name, model, latency_ms = await pipeline.draft_message(
+        draft, warnings, served_by, model, latency_ms = await pipeline.draft_message(
             provider, snapshot, channel=channel.value
         )
     except ProviderUnavailable as exc:
@@ -318,7 +324,7 @@ async def generate_message(
         body=draft.body,
         tone=draft.tone,
         status=MessageStatus.DRAFT.value,
-        provider=provider_name.value,
+        provider=served_by.value,
         model=model,
     )
     session.add(message)
@@ -329,7 +335,7 @@ async def generate_message(
         "message_drafted",
         candidate_id=candidate_id,
         channel=channel.value,
-        provider=provider_name.value,
+        provider=served_by.value,
         latency_ms=latency_ms,
         warnings=len(warnings),
     )
