@@ -37,7 +37,7 @@ make reset                              # wipe, migrate, reseed
 
 ## Demo Mode
 
-**The application runs with no API key.** With `GEMINI_API_KEY` unset, a
+**The application runs with no API key.** With no provider key set, a
 deterministic mock provider serves every analysis and message. Every screen
 populates, the automation fires, the analytics compute, and the test suite runs
 — all without a single LLM call or a rupee of spend.
@@ -47,16 +47,18 @@ carries, matches the candidate's own words against a keyword lexicon, and
 returns signals with **genuine verbatim quotes** pulled from those messages.
 The brief's relocation example is detected here exactly as Gemini detects it.
 
-Setting `GEMINI_API_KEY` switches to Live Mode with no other change.
+Setting `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY`) switches to Live Mode with
+no other change. Three providers are available and selectable per call from
+the UI: `claude`, `gemini`, `mock`.
 
 **It is labelled everywhere**, deliberately:
 
 | Surface | Demo Mode | Live Mode |
 |---|---|---|
-| UI header badge | `DEMO MODE — deterministic mock, no LLM calls` | `LIVE — gemini-2.5-flash` |
-| `GET /api/v1/ai/status` | `"provider": "mock"` | `"provider": "gemini"` |
+| UI header badge | `DEMO MODE — deterministic mock, no LLM calls` | `LIVE — claude-haiku-4-5` |
+| `GET /api/v1/ai/status` | `"provider": "mock"` | `"provider": "claude"` |
 | `GET /api/v1/health/ready` | `"mode": "demo"` | `"mode": "live"` |
-| Every stored analysis | `provider = mock` | `provider = gemini` |
+| Every stored analysis | `provider = mock` | `provider = claude` |
 
 If a mock returned flawless, perfectly stable output with no indication of what
 it was, a reviewer would be right to wonder whether the "AI" is hardcoded.
@@ -102,12 +104,14 @@ flowchart TB
         SCHED[[APScheduler]]
     end
     PG[(PostgreSQL 16)]
+    CLA[Claude API]
     GEM[Gemini API]
     MOCK[Mock provider]
 
     R --> Web -->|REST /api/v1| API
     Modules --> Domain
     Modules --> AI
+    PORT --> CLA
     PORT --> GEM
     PORT --> MOCK
     API --> PG
@@ -189,7 +193,7 @@ flowchart TD
     SNAP --> HASH[SHA-256 input hash]
     HASH --> CACHE{Cached?}
     CACHE -->|hit| DONE[Return stored analysis]
-    CACHE -->|miss| GEN[Gemini · response_schema forced]
+    CACHE -->|miss| GEN[Provider · schema-forced generation]
     GEN --> VAL{Pydantic validates?}
     VAL -->|yes| GUARD[Guardrails]
     VAL -->|no| REPAIR[Repair · feed error back]
@@ -229,9 +233,10 @@ AIAnalysis
 
 **Validation is four layers, not one:**
 
-1. **Schema-forced generation.** Gemini is given `response_mime_type=application/json`
-   plus an explicit `response_schema`, constraining it at decode time rather
-   than asking politely for JSON.
+1. **Schema-forced generation.** Gemini takes `response_schema`; Claude takes
+   the schema as a forced tool's `input_schema`. Different mechanisms, same
+   property: the model is constrained at decode time rather than asked politely
+   for JSON.
 2. **Pydantic validation.** The boundary between "the model said something" and
    "the system believes it".
 3. **One repair attempt.** The invalid output *and* the exact validator error
@@ -428,6 +433,32 @@ created, because the task is what actually gets the candidate contacted.
 
 ---
 
+### The engagement journey
+
+```mermaid
+flowchart LR
+    A[Offer Accepted<br/><i>SLA day 0</i>] --> B[Welcome<br/><i>day 2</i>]
+    B --> C[Documentation<br/><i>day 10</i>]
+    C --> D[Manager Introduction<br/><i>day 20</i>]
+    D --> E[Pre-Joining Check-in<br/><i>day 35</i>]
+    E --> F[Joining<br/><i>day 45</i>]
+
+    C -.->|past SLA| OD([stage_overdue fires])
+    D -.->|past SLA| OD
+    OD --> FU[[Follow-up raised]]
+
+    style A fill:#d1fae5
+    style F fill:#d1fae5
+    style OD fill:#fef3c7
+```
+
+SLAs are days from the **offer date**, frozen onto each `candidate_stages` row
+at creation so a later template change cannot silently move historical
+deadlines. A stage past its SLA is what turns a passive checklist into
+something that raises an alert.
+
+---
+
 ## 5. Trade-offs, and what would change for production
 
 | Decision | Chosen | Rejected | Why | Revisit when |
@@ -500,6 +531,44 @@ buys some headroom; beyond that it is OpenSearch or Postgres full-text.
 **Table partitioning** on `interactions` and `ai_analyses` by month, since both
 grow without bound and queries are almost always recent-window.
 
+### The shape it would take
+
+```mermaid
+flowchart TB
+    LB[Load balancer] --> API1[API replica]
+    LB --> API2[API replica]
+    LB --> API3[API replica]
+
+    API1 & API2 & API3 --> PRIM[(Primary<br/>writes)]
+    API1 & API2 & API3 --> RR[(Read replicas<br/>dashboard reads)]
+    PRIM -.->|streaming| RR
+
+    API1 & API2 & API3 -->|enqueue| Q[[Job queue<br/>Redis / SQS]]
+    Q --> W1[AI worker]
+    Q --> W2[AI worker]
+    W1 & W2 --> LLM[Provider<br/>global rate limit]
+    W1 & W2 --> PRIM
+
+    SCHED[[External scheduler<br/>CronJob]] -->|dispatch| Q
+
+    PRIM --> ROLL[Nightly rollup job]
+    ROLL --> AGG[(Aggregate tables<br/>per day / recruiter / stage)]
+    RR --> AGG
+
+    PRIM -.->|CDC| COL[(Columnar store<br/>LLM ledger)]
+
+    style Q fill:#e0e7ff
+    style AGG fill:#d1fae5
+    style SCHED fill:#fef3c7
+```
+
+Four changes carry most of the weight: **AI moves behind a queue** so request
+latency stops depending on provider latency; **the scheduler moves out of the
+API process**, which removes the multi-replica flaw entirely rather than
+mitigating it; **analytics read pre-aggregated rollups** so dashboard cost stops
+scaling with history; and **dashboards read replicas** while writes stay on the
+primary.
+
 ---
 
 ## Security
@@ -540,8 +609,37 @@ grow without bound and queries are almost always recent-window.
 ## Testing
 
 ```bash
-docker compose run --rm api pytest -q     # 166 tests, ~11s
+docker compose run --rm api pytest -q   # 198 tests: 166 unit + 32 integration
+make eval                               # score AI extraction (mock, free)
+make eval-live                          # compare providers (uses real tokens)
 ```
+
+### Measured, not asserted
+
+`make eval` scores 22 labelled scenarios in `backend/evals/golden_set.json`:
+
+```
+  metric                    mock      claude
+  schema_validity_pct     100.00      100.00
+  band_exact_pct           72.73       72.73
+  signal_precision          0.88        0.75
+  signal_recall             0.94        0.94
+  grounding_drops           0.00        0.00
+  injection_leaks           0.00        0.00
+  latency_p50_ms            1.00     3900.00
+```
+
+Band accuracy is **agreement with a reviewer's labels, not correctness** —
+there are no joined/dropped outcomes to calibrate against, and reporting it as
+accuracy would overclaim.
+
+The golden set deliberately contains cases the mock fails: negation
+(*"relocation is completely sorted, no issues"*), paraphrase (*"the number they
+came back with is above what we agreed"*), politeness masking disengagement. An
+eval containing only passing cases measures nothing.
+
+Claude's lower precision is a real, measured difference: it over-reports
+`low_enthusiasm` and `positive_intent` on thin evidence.
 
 The domain layer is pure, so risk, confidence, ranking and rule predicates are
 tested exhaustively without a database. The AI pipeline's **failure paths** are

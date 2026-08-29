@@ -8,60 +8,53 @@ Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 
 ---
 
-## 1. Current state
+## 1. Current state — ALL STAGES COMPLETE
 
-| Stage | Status | Notes |
-|---|---|---|
-| 1 Foundation | ✅ verified | compose, config, structured logging, error envelope, health probes |
-| 2 Data | ✅ verified | 12 tables, 3 migrations, 60 seeded candidates |
-| 3 Core API | ✅ verified | candidates CRUD + filters, interactions, stages, audit hooks |
-| 4 Domain | ✅ verified | risk / confidence / attention / rules as pure functions |
-| 5 AI pipeline | ✅ verified | provider port, mock, Gemini adapter, validate→repair→fallback |
-| 6 Automation | ✅ verified | idempotent follow-ups, APScheduler, advisory lock, run log |
-| 7 Analytics | ✅ verified | every brief-mandated metric |
-| 8 Frontend | ✅ verified | queue, dashboard, detail, analytics — all render, CORS confirmed |
-| 9 Auth | ✅ verified | login, RBAC 401/403/200, no user enumeration, rate limit 20/min |
-| Live Mode | ✅ verified | real Gemini call: valid, 4.7s, 1019/210 tokens, both signals with exact quotes |
-| Add candidate | ✅ verified | form + `GET /recruiters`; 422 on bad dates, 409 on duplicate email |
-| Log interaction | ✅ verified | inline form on the detail page; back-dating supported |
-| Edit draft | ✅ verified | `PATCH /ai/messages/{id}`; drafts only, marked `human_edited` |
-| Claude provider | ✅ verified | third provider via the port; full eval, 0 failures |
-| Provider toggle | ✅ verified | per-call `?provider=gemini\|mock` on analyse and draft; UI toggle on both panels |
-| 10 Eval harness | ✅ done | 22-scenario golden set, `make eval`; mock scored |
-| 10 Integration tests | ❌ not started | see §4b |
-| 11 Docs | 🟡 **README done**, 2 of 6 diagrams | see §5 |
-| 12 Critical review | ❌ not started | see §6 |
+| Stage | Status |
+|---|---|
+| 1 Foundation | ✅ compose, config, structured logging, error envelope, health probes |
+| 2 Data | ✅ 12 tables, 3 migrations, 60 seeded candidates |
+| 3 Core API | ✅ candidates CRUD + filters, interactions, stages, audit |
+| 4 Domain | ✅ risk / confidence / attention / rules as pure functions |
+| 5 AI pipeline | ✅ port, mock, Gemini, Claude, validate→repair→fallback |
+| 6 Automation | ✅ idempotent follow-ups, scheduler, advisory lock, run log |
+| 7 Analytics | ✅ every brief-mandated metric |
+| 8 Frontend | ✅ queue, dashboard, detail, analytics, add candidate |
+| 9 Auth | ✅ JWT, RBAC, rate limiting |
+| 10 Eval + tests | ✅ 22-scenario golden set, 198 tests |
+| 11 Docs | ✅ README (6 sections, 6 diagrams), decisions.md, database.md |
+| 12 Critical review | ✅ swept; findings in §6 |
 
-**166 backend tests pass.** Run: `docker compose run --rm api pytest -q`
+**198 tests** (166 unit + 32 integration) · `docker compose run --rm api pytest -q`
 
 ### Running it
 
 ```bash
-docker compose up -d          # db + api + web
+docker compose up -d
 docker compose exec -T api python -m app.db.seed
 ```
 
-- Frontend: http://localhost:3000
-- API docs: http://localhost:8000/docs
-- DB: `localhost:5432`, `engagement` / `postgres` / `postgres`
+Frontend http://localhost:3000 · API docs http://localhost:8000/docs
 
-Runs with **no API key** — a deterministic mock provider serves everything
-(Demo Mode). Set `GEMINI_API_KEY` for Live Mode.
+Active provider is **Claude Haiku**. Gemini's adapter still works but its key
+is unset (free tier is 20 req/day and was exhausted). Demo Mode needs no key.
 
-### ⚠️ API key hygiene
+### ⚠️ Key hygiene
 
-`.env` currently holds a **real Gemini key** and is gitignored — verify with
-`git check-ignore -v .env` before every push. That key was pasted into a chat,
-so treat it as exposed: **rotate it in Google AI Studio** once demoing is done.
+`.env` holds a real Anthropic key and is gitignored — verify with
+`git check-ignore -v .env` before any push. It was pasted into a chat, so treat
+it as exposed and **rotate it** when demoing is done.
 
-`AUTOMATION_ENABLED=false` in `.env` on purpose. With Live Mode on, the hourly
-sweep drafts messages and would spend free-tier quota in the background with
-nobody watching. Turn it back on for the automation demo, or trigger manually
-with `POST /api/v1/automation/run`.
+---
 
-**Free tier is limited.** Each analysis is ~1.2k tokens and takes ~5s. Do not
-run `/ai/analyze-batch` over all 48 active candidates on the live key unless you
-intend to; use Demo Mode (unset the key) for bulk work.
+### What remains (nothing blocking)
+
+- **Screenshots or a demo video** — the brief asks; nothing captured.
+- **Reads are unauthenticated** — RBAC guards only `/audit`. Deliberate demo
+  affordance, documented in README §5 and decisions.md §15. Decide before this
+  touches real data.
+- Frontend has no tests.
+- No CI pipeline.
 
 ---
 
@@ -379,6 +372,13 @@ receiving a cached mock result would defeat the point.
 ## 6. Stage 12 — Critical review
 
 Known weak points to address or document:
+
+Swept on completion. Verified clean: no secrets in tracked source, `.env`
+untracked, no TODO/FIXME left behind, no bare excepts that swallow errors
+(both re-raise), `raw_response` never returned by an API model and excluded
+from audit snapshots, no truthiness checks left on numeric fields.
+
+Remaining known weaknesses, all documented rather than hidden:
 
 | Issue | Where | Suggested action |
 |---|---|---|
