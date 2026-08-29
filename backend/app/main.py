@@ -13,6 +13,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.db.session import engine
+from app.modules.attention.router import router as attention_router
 from app.modules.candidates.router import router as candidates_router
 from app.modules.engagement.router import router as engagement_router
 from app.modules.health.router import router as health_router
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(health_router, prefix=settings.api_prefix)
+    app.include_router(attention_router, prefix=settings.api_prefix)
     app.include_router(candidates_router, prefix=settings.api_prefix)
     # Registered after candidates so the more specific /candidates/{id}/...
     # routes do not shadow the candidate detail route.

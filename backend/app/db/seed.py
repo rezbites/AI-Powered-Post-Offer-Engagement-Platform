@@ -254,7 +254,9 @@ ARCHETYPES: list[Archetype] = [
         weight=4,
         status=CandidateStatus.ENGAGED,
         expected_risk=RiskLevel.MEDIUM,
-        joining_offset=(5, 18),
+        # Kept outside the 7-day critical window: inside it, silence plus
+        # imminence would correctly escalate this to HIGH.
+        joining_offset=(12, 25),
         stages_completed=(2, 4),
         interactions=[
             ScriptedInteraction(
@@ -289,7 +291,7 @@ ARCHETYPES: list[Archetype] = [
                 "Will do. I am tracking down my previous employment letters.",
             ),
             ScriptedInteraction(
-                4, InteractionDirection.OUTBOUND, InteractionChannel.WHATSAPP,
+                6, InteractionDirection.OUTBOUND, InteractionChannel.WHATSAPP,
                 "Gentle nudge on the pending documents - the BGV team needs them to start the check.",
             ),
         ],
@@ -550,9 +552,18 @@ async def seed(count: int = 60) -> None:
             template, stages = await _seed_journey(session)
             total = await _seed_candidates(session, recruiters, template, stages, count)
 
+        # Archetype labels are a recruiter's judgement of each scenario; the
+        # engine is what the product actually shows. Running it here means the
+        # seeded database is self-consistent from the first page load rather
+        # than displaying labels no code would reproduce.
+        from app.modules.attention import service as attention_service
+
+        stats = await attention_service.recompute_risk(session, today=date.today())
+
     logger.info(
         "seed_complete",
         candidates=total,
+        risk_recomputed=stats["updated"],
         recruiters=len(recruiters),
         stages=len(stages),
         password=DEMO_PASSWORD,

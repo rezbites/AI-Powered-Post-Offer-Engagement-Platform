@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.logging import get_logger, request_id_ctx
@@ -154,12 +154,35 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(SQLAlchemyError)
     async def _db_error(_request: Request, exc: SQLAlchemyError) -> JSONResponse:
-        # Driver messages can disclose schema and connection details, so the
-        # detail stays server-side and the client gets a clean 503.
-        logger.error("database_error", error=str(exc), exc_info=True)
+        """Database failures.
+
+        A genuine connection or driver failure (DBAPIError) is a dependency
+        outage and must be a 503 so load balancers stop routing here. Anything
+        else from SQLAlchemy - a bad query, a lazy load attempted in async
+        context - is *our* bug, and reporting it as 503 would send whoever is
+        on call to investigate a perfectly healthy database.
+
+        Either way the driver message stays server-side: it can disclose schema
+        and connection details.
+        """
+        is_outage = isinstance(exc, DBAPIError) and exc.connection_invalidated
+
+        logger.error(
+            "database_error",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            outage=is_outage,
+            exc_info=True,
+        )
+
+        if is_outage:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=error_body("service_unavailable", "The database is currently unavailable."),
+            )
         return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content=error_body("service_unavailable", "The database is currently unavailable."),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=error_body("internal_error", "An unexpected error occurred."),
         )
 
     @app.exception_handler(Exception)
