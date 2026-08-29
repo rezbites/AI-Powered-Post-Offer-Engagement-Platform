@@ -328,6 +328,13 @@ async def ai_status() -> dict[str, object]:
         "prompt_version": service.pipeline.PROMPT_VERSION,
         # Lets the UI offer a provider choice only when it can be honoured.
         "available": available_providers(),
+        # Model name per provider, so the toggle can label each button with
+        # what it will actually call rather than guessing from the active one.
+        "models": {
+            "mock": "deterministic-mock-v1",
+            "gemini": settings.gemini_model,
+            "claude": settings.anthropic_model,
+        },
         "description": (
             "Demo Mode - analyses are produced by a deterministic mock provider. "
             "No LLM calls are made. Set GEMINI_API_KEY to enable Live Mode."

@@ -184,7 +184,9 @@ export interface AIStatus {
   prompt_version: string;
   description: string;
   /** Which providers this deployment can actually honour. */
-  available: { mock: boolean; gemini: boolean };
+  available: Record<string, boolean>;
+  /** Model name per provider, so the toggle can label each button. */
+  models: Record<string, string>;
 }
 
 export interface FollowUp {

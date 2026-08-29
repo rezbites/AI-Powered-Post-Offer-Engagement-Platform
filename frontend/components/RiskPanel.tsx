@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { ProviderToggle } from "./ProviderToggle";
+import { ProviderToggle, useDefaultProvider } from "./ProviderToggle";
 import { RiskBadge } from "./RiskBadge";
 import type { CandidateDetail, RiskLevel } from "@/types/api";
 
@@ -25,7 +25,12 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   const [overriding, setOverriding] = useState(false);
   const [level, setLevel] = useState<RiskLevel>(candidate.risk.level);
   const [reason, setReason] = useState("");
-  const [provider, setProvider] = useState("gemini");
+  // Starts on whatever the server actually resolved. The previous
+  // hardcoded default went stale the moment a provider was swapped out,
+  // leaving the panel pre-selected on one with no key.
+  const defaultProvider = useDefaultProvider();
+  const [provider, setProvider] = useState<string | null>(null);
+  const activeProvider = provider ?? defaultProvider;
   const [confidence, setConfidence] = useState(1);
 
   const invalidate = () => {
@@ -49,7 +54,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   });
 
   const analyze = useMutation({
-    mutationFn: () => api.analyze(candidate.id, true, provider),
+    mutationFn: () => api.analyze(candidate.id, true, activeProvider),
     onSuccess: invalidate,
   });
 
@@ -75,7 +80,7 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <ProviderToggle value={provider} onChange={setProvider} />
+          <ProviderToggle value={activeProvider} onChange={setProvider} />
           <button
             onClick={() => analyze.mutate()}
             disabled={analyze.isPending}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { ProviderToggle } from "./ProviderToggle";
+import { ProviderToggle, useDefaultProvider } from "./ProviderToggle";
 import type { GeneratedMessage } from "@/types/api";
 
 /**
@@ -22,7 +22,12 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftSubject, setDraftSubject] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState("");
-  const [provider, setProvider] = useState("gemini");
+  // Starts on whatever the server actually resolved. The previous
+  // hardcoded default went stale the moment a provider was swapped out,
+  // leaving the panel pre-selected on one with no key.
+  const defaultProvider = useDefaultProvider();
+  const [provider, setProvider] = useState<string | null>(null);
+  const activeProvider = provider ?? defaultProvider;
 
   const { data: messages } = useQuery({
     queryKey: ["messages", candidateId],
@@ -31,7 +36,7 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
 
   const draft = useMutation({
     mutationFn: (channel: "email" | "whatsapp") =>
-      api.draftMessage(candidateId, channel, provider),
+      api.draftMessage(candidateId, channel, activeProvider),
     onSuccess: (msg: GeneratedMessage) => {
       setWarnings(msg.warnings ?? []);
       qc.invalidateQueries({ queryKey: ["messages", candidateId] });
@@ -56,7 +61,7 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
         <h2 className="text-sm font-semibold text-slate-900">Messages</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <ProviderToggle value={provider} onChange={setProvider} />
+          <ProviderToggle value={activeProvider} onChange={setProvider} />
           <button
             onClick={() => draft.mutate("email")}
             disabled={draft.isPending}
