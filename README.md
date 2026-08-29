@@ -128,6 +128,11 @@ issues at all"), sarcasm, or paraphrase. That is what Live Mode is for.
 
 ## 1. Architecture and database schema
 
+> Diagrams below are Mermaid. If they show a spinner rather than a picture,
+> that is GitHub's renderer, not the source — the plain-text architecture
+> diagram under **How it works** above says the same thing and always
+> renders.
+
 Three services on one compose network. Deliberately a modular monolith, not
 microservices — at this size the coordination cost buys nothing.
 
@@ -187,25 +192,36 @@ erDiagram
         string risk_level
         float risk_confidence
         string risk_source
-        string risk_override_reason
         datetime last_interaction_at
     }
     AI_ANALYSES {
-        string input_hash "SHA-256 cache key"
-        string risk_level "blended, authoritative"
-        string model_risk_level "what the model proposed"
-        float risk_confidence "derived"
-        float model_confidence "self-reported, telemetry"
-        json signals "type + verbatim quote"
+        string input_hash
+        string risk_level
+        string model_risk_level
+        float risk_confidence
+        float model_confidence
+        json signals
         int dropped_signals
         string provider
         int latency_ms
     }
     FOLLOW_UP_ACTIONS {
         string rule_key
-        date dedupe_date "idempotency key"
+        date dedupe_date
     }
 ```
+
+The columns worth knowing:
+
+| Column | Why it exists |
+|---|---|
+| `candidates.risk_source` | `rule`, `ai` or `human`. A human override is never overwritten. |
+| `candidates.risk_confidence` | Evidence strength, derived — separate from the band. |
+| `ai_analyses.input_hash` | SHA-256 of the canonical snapshot. The cache key, and how freshness works without a TTL. |
+| `ai_analyses.risk_level` | The authoritative blended band the product shows. |
+| `ai_analyses.model_risk_level` | What the model *proposed*. Kept so disagreement stays measurable. |
+| `ai_analyses.dropped_signals` | Signals whose quote was not in the candidate's messages. The hallucination counter. |
+| `follow_up_actions.dedupe_date` | The idempotency key. One action per candidate, per rule, per window. |
 
 Full dump: [`docs/schema.sql`](docs/schema.sql). Access guide:
 [`docs/database.md`](docs/database.md).
