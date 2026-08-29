@@ -15,6 +15,8 @@ from app.core.middleware import RequestContextMiddleware
 from app.db.session import engine
 from app.modules.ai.router import router as ai_router
 from app.modules.analytics.router import router as analytics_router
+from app.modules.audit.router import router as audit_router
+from app.modules.auth.router import router as auth_router
 from app.modules.attention.router import router as attention_router
 from app.modules.automation.router import router as automation_router
 from app.modules.automation.scheduler import start_scheduler, stop_scheduler
@@ -87,6 +89,8 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(health_router, prefix=settings.api_prefix)
+    app.include_router(auth_router, prefix=settings.api_prefix)
+    app.include_router(audit_router, prefix=settings.api_prefix)
     app.include_router(ai_router, prefix=settings.api_prefix)
     app.include_router(analytics_router, prefix=settings.api_prefix)
     app.include_router(attention_router, prefix=settings.api_prefix)

@@ -19,6 +19,7 @@ import type {
   CandidateSummary,
   FollowUp,
   GeneratedMessage,
+  Interaction,
   Page,
   RiskLevel,
 } from "@/types/api";
@@ -81,7 +82,7 @@ export interface CandidateFilters {
   offset?: number;
 }
 
-function queryString(params: Record<string, unknown>): string {
+function queryString(params: object): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     // Empty strings are how "no filter selected" arrives from a <select>;
@@ -170,11 +171,3 @@ export const api = {
       body: JSON.stringify({}),
     }),
 };
-
-interface Interaction {
-  id: string;
-  channel: string;
-  direction: string;
-  content: string;
-  occurred_at: string;
-}

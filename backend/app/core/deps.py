@@ -70,6 +70,46 @@ async def get_current_actor(
 ActorDep = Annotated[Actor, Depends(get_current_actor)]
 
 
+async def require_actor(actor: ActorDep) -> Actor:
+    """Reject anonymous callers.
+
+    Used on routes that mutate state or expose the full candidate list, so an
+    unauthenticated read is a deliberate product decision rather than an
+    oversight nobody noticed.
+    """
+    from app.core.errors import UnauthorizedError
+
+    if not actor.is_authenticated:
+        raise UnauthorizedError("Sign in to continue.")
+    return actor
+
+
+AuthedActorDep = Annotated[Actor, Depends(require_actor)]
+
+
+def require_role(*roles: str):
+    """Dependency factory enforcing membership of one of `roles`.
+
+    Admins pass every check: a role hierarchy expressed as an explicit
+    exception here is clearer than duplicating "admin" into every call site and
+    eventually forgetting one.
+    """
+
+    async def _dependency(actor: ActorDep) -> Actor:
+        from app.core.errors import ForbiddenError, UnauthorizedError
+
+        if not actor.is_authenticated:
+            raise UnauthorizedError("Sign in to continue.")
+        if actor.is_admin or actor.role in roles:
+            return actor
+        raise ForbiddenError(
+            "Your role does not permit this action.",
+            details={"required": list(roles), "actual": actor.role},
+        )
+
+    return _dependency
+
+
 def pagination(
     limit: Annotated[int, Query(ge=1, le=200, description="Maximum rows to return.")] = 50,
     offset: Annotated[int, Query(ge=0, description="Rows to skip.")] = 0,

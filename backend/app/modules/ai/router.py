@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.core.deps import ActorDep, SessionDep
+from app.core.ratelimit import ai_rate_limit
 from app.domain.enums import (
     AnalysisStatus,
     InteractionChannel,
@@ -134,6 +135,8 @@ def _to_analysis_response(record, *, from_cache: bool) -> AnalysisResponse:
     "/candidates/{candidate_id}/ai/analyze",
     response_model=AnalysisResponse,
     summary="Analyse a candidate and store the result",
+    # Rate limited: each call can cost a real LLM request.
+    dependencies=[Depends(ai_rate_limit)],
 )
 async def analyze_candidate(
     session: SessionDep,
@@ -156,6 +159,7 @@ async def analyze_candidate(
 @router.post(
     "/ai/analyze-batch",
     summary="Analyse many candidates",
+    dependencies=[Depends(ai_rate_limit)],
 )
 async def analyze_batch(
     session: SessionDep,
@@ -179,6 +183,7 @@ async def analyze_batch(
     response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Draft a personalised message",
+    dependencies=[Depends(ai_rate_limit)],
 )
 async def draft_message(
     session: SessionDep,
