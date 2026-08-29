@@ -1,3 +1,4 @@
+import { AddCandidateDialog } from "@/components/AddCandidateDialog";
 import { AttentionQueue } from "@/components/AttentionQueue";
 import { CandidateTable } from "@/components/CandidateTable";
 
@@ -12,13 +13,16 @@ import { CandidateTable } from "@/components/CandidateTable";
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">
-          Who needs attention today?
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Candidates between offer acceptance and joining, ranked by urgency.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">
+            Who needs attention today?
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Candidates between offer acceptance and joining, ranked by urgency.
+          </p>
+        </div>
+        <AddCandidateDialog />
       </div>
 
       <AttentionQueue />

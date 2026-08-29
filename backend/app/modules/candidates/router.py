@@ -28,6 +28,37 @@ from app.modules.candidates.schemas import (
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
+# Separate router: recruiters are their own resource, not a sub-resource of
+# candidates, so nesting the path under /candidates would misrepresent them.
+recruiters_router = APIRouter(prefix="/recruiters", tags=["recruiters"])
+
+
+class RecruiterOption(BaseModel):
+    """Minimal shape for an assignment dropdown.
+
+    Deliberately not the full recruiter record: a form that only needs to
+    populate a <select> has no business receiving email addresses or role
+    information for every user in the organisation.
+    """
+
+    id: str
+    name: str
+
+
+@recruiters_router.get("", response_model=list[RecruiterOption], summary="Recruiters for assignment")
+async def list_recruiters(session: SessionDep) -> list[RecruiterOption]:
+    from sqlalchemy import select
+
+    from app.db.models import Recruiter
+
+    stmt = (
+        select(Recruiter.id, Recruiter.name)
+        .where(Recruiter.is_active.is_(True))
+        .order_by(Recruiter.name)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [RecruiterOption(id=r.id, name=r.name) for r in rows]
+
 
 def candidate_filters(
     joining_month: Annotated[str | None, Query(description="Joining month as YYYY-MM.")] = None,

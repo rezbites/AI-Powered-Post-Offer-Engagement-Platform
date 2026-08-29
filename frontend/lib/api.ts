@@ -21,6 +21,7 @@ import type {
   GeneratedMessage,
   Interaction,
   Page,
+  Recruiter,
   RiskLevel,
 } from "@/types/api";
 
@@ -71,6 +72,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Shape accepted by POST /candidates. */
+export interface NewCandidate {
+  name: string;
+  email: string;
+  phone: string | null;
+  role_title: string;
+  location: string;
+  offer_date: string;
+  joining_date: string;
+  recruiter_id: string;
+  notes: string | null;
+}
+
 export interface CandidateFilters {
   joining_month?: string;
   recruiter_id?: string;
@@ -105,6 +119,14 @@ export const api = {
   candidate: (id: string) => request<CandidateDetail>(`/candidates/${id}`),
 
   roles: () => request<string[]>(`/candidates/roles`),
+
+  recruiters: () => request<Recruiter[]>(`/recruiters`),
+
+  createCandidate: (payload: NewCandidate) =>
+    request<CandidateDetail>(`/candidates`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   analyze: (id: string, force = false) =>
     request<AnalysisResponse>(

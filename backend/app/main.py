@@ -20,6 +20,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.attention.router import router as attention_router
 from app.modules.automation.router import router as automation_router
 from app.modules.automation.scheduler import start_scheduler, stop_scheduler
+from app.modules.candidates.router import recruiters_router
 from app.modules.candidates.router import router as candidates_router
 from app.modules.engagement.router import router as engagement_router
 from app.modules.health.router import router as health_router
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(attention_router, prefix=settings.api_prefix)
     app.include_router(automation_router, prefix=settings.api_prefix)
     app.include_router(candidates_router, prefix=settings.api_prefix)
+    app.include_router(recruiters_router, prefix=settings.api_prefix)
     # Registered after candidates so the more specific /candidates/{id}/...
     # routes do not shadow the candidate detail route.
     app.include_router(engagement_router, prefix=settings.api_prefix)
