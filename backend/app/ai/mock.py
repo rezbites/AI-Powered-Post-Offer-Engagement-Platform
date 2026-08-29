@@ -170,8 +170,33 @@ def _assess(snapshot: dict[str, Any], signals: list[dict[str, str]]) -> tuple[Ri
     return RiskLevel.LOW, 0.68
 
 
+def _concern_already_addressed(snapshot: dict[str, Any]) -> bool:
+    """Whether the recruiter has replied since the candidate last raised something.
+
+    Crude - it compares recency, not meaning - but it stops the mock
+    recommending an action the transcript shows was already taken, which is
+    the failure mode that matters here.
+    """
+    interactions = snapshot.get("interactions", [])
+    last_inbound = next(
+        (i for i in reversed(interactions) if i.get("direction") == "inbound"), None
+    )
+    last_outbound = next(
+        (i for i in reversed(interactions) if i.get("direction") == "outbound"), None
+    )
+    if not last_inbound or not last_outbound:
+        return False
+    # Lower days_ago means more recent.
+    return last_outbound.get("days_ago", 999) <= last_inbound.get("days_ago", 0)
+
+
 def _choose_action(snapshot: dict[str, Any], signals: list[dict[str, str]], level: RiskLevel) -> NextAction:
     types = {s["type"] for s in signals}
+
+    # A concern the recruiter has already responded to needs confirming,
+    # not repeating.
+    if types and _concern_already_addressed(snapshot):
+        return NextAction.MONITOR
 
     for signal_type, action in _ACTION_BY_SIGNAL:
         if signal_type.value in types:
@@ -244,6 +269,10 @@ def _follow_up(action: NextAction, snapshot: dict[str, Any]) -> str:
         NextAction.MANAGER_INTRODUCTION: f"Set up an introduction between {name} and their hiring manager.",
         NextAction.SCHEDULE_CONVERSATION: f"Schedule a call with {name} to work through their concern.",
         NextAction.ESCALATE: f"Escalate {name} to the HR lead - joining is at material risk.",
+        NextAction.MONITOR: (
+            f"{name}'s concern is being worked through. Follow up in a few days to "
+            "confirm it is resolved rather than sending the same information again."
+        ),
         NextAction.NO_ACTION: f"No action needed; {name} is engaged and on track.",
     }[action]
 

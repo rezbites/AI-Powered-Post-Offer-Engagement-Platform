@@ -45,6 +45,8 @@ export interface RiskView {
   source: RiskSource;
   rationale: string;
   factors: string[];
+  /** Term-by-term derivation of `confidence`. */
+  confidence_factors: string[];
   signals: Signal[];
   override_reason: string | null;
   overridden_by: string | null;

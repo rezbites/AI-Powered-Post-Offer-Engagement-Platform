@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ProviderToggle, useDefaultProvider } from "./ProviderToggle";
-import { RiskBadge } from "./RiskBadge";
+import { ConfidenceMeter, RISK_MEANING, RiskBadge } from "./RiskBadge";
 import type { CandidateDetail, RiskLevel } from "@/types/api";
 
 /**
@@ -64,19 +64,44 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <RiskBadge
-            level={risk.level}
-            confidence={risk.confidence > 0 ? risk.confidence : undefined}
-          />
-          {/* 0.0 means "nothing has assessed this candidate yet", which is a
-              different statement from "assessed, with zero confidence".
-              Rendering both as 0% would misrepresent the first. */}
-          <span className="text-xs text-slate-500">
-            {risk.confidence > 0
-              ? `${Math.round(risk.confidence * 100)}% confidence (heuristic)`
-              : "not yet assessed"}
-          </span>
+        {/* Two separate statements, deliberately not merged. The band is
+            how likely this candidate is to drop out; the meter is how much
+            evidence backs that call. Rendering them as one figure ("LOW 95%")
+            reads as a single probability and destroys the distinction. */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+              Risk of not joining
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <RiskBadge level={risk.level} />
+              <span className="text-sm text-slate-600">
+                {RISK_MEANING[risk.level]}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+              How well supported
+            </div>
+            <div className="mt-1.5">
+              {risk.confidence > 0 ? (
+                <ConfidenceMeter
+                  value={risk.confidence}
+                  detail={
+                    risk.confidence_factors?.length
+                      ? risk.confidence_factors.join(", ")
+                      : undefined
+                  }
+                />
+              ) : (
+                // 0.0 means nothing has assessed this candidate yet - a
+                // different statement from "assessed, no confidence".
+                <span className="text-xs text-slate-500">not yet assessed</span>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -151,6 +176,27 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
           <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             {candidate.ai_summary}
           </p>
+        )}
+
+        {risk.confidence_factors?.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">
+              How was {Math.round(risk.confidence * 100)}% arrived at?
+            </summary>
+            {/* The arithmetic, term by term. A confidence figure nobody can
+                interrogate is one a recruiter is right to ignore. */}
+            <ul className="mt-2 space-y-1 rounded-md bg-slate-50 px-3 py-2">
+              {risk.confidence_factors.map((f) => (
+                <li key={f} className="text-xs text-slate-600">
+                  {f}
+                </li>
+              ))}
+              <li className="border-t border-slate-200 pt-1 text-xs text-slate-500">
+                Evidence strength, not a probability — there are no
+                joined/dropped outcomes to calibrate against.
+              </li>
+            </ul>
+          </details>
         )}
 
         {/* The "Why?" list. This is the difference between an explainable

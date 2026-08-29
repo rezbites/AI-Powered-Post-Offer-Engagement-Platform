@@ -81,11 +81,7 @@ export function AttentionQueue() {
                   >
                     {item.name}
                   </Link>
-                  <RiskBadge
-                    level={item.risk_level}
-                    confidence={item.risk_confidence}
-                    size="sm"
-                  />
+                  <RiskBadge level={item.risk_level} size="sm" />
                   <span className="text-xs text-slate-500">
                     {item.days_to_joining < 0
                       ? `joining date passed ${Math.abs(item.days_to_joining)}d ago`

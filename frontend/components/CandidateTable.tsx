@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type CandidateFilters } from "@/lib/api";
-import { RiskBadge } from "./RiskBadge";
+import { ConfidenceMeter, RiskBadge } from "./RiskBadge";
 import type { RiskLevel } from "@/types/api";
 
 const STATUSES = [
@@ -134,6 +134,7 @@ export function CandidateTable() {
               <th className="px-3 py-2.5 font-medium">Joining</th>
               <th className="px-3 py-2.5 font-medium">Last contact</th>
               <th className="px-3 py-2.5 font-medium">Risk</th>
+              <th className="px-3 py-2.5 font-medium">Evidence</th>
               {/* The brief requires risk, why, and next action visible on the
                   list itself - not one click away. */}
               <th className="px-3 py-2.5 font-medium">Why</th>
@@ -183,12 +184,14 @@ export function CandidateTable() {
                   )}
                 </td>
                 <td className="px-3 py-3">
-                  <RiskBadge
-                    level={c.risk.level}
-                    source={c.risk.source}
-                    confidence={c.risk.confidence}
-                    size="sm"
-                  />
+                  <RiskBadge level={c.risk.level} source={c.risk.source} size="sm" />
+                </td>
+                <td className="px-3 py-3">
+                  {c.risk.confidence > 0 ? (
+                    <ConfidenceMeter value={c.risk.confidence} />
+                  ) : (
+                    <span className="text-xs text-slate-400">not assessed</span>
+                  )}
                 </td>
                 <td className="max-w-xs px-3 py-3 text-xs text-slate-600">
                   {c.why.length ? c.why.join(" · ") : "—"}

@@ -123,6 +123,14 @@ class RiskView(BaseModel):
     source: RiskSource
     rationale: str = ""
     factors: list[str] = Field(default_factory=list)
+    confidence_factors: list[str] = Field(
+        default_factory=list,
+        description=(
+            "How the confidence figure was derived, term by term. Surfaced so "
+            "'why that number?' is answerable in the product rather than by "
+            "reading the source."
+        ),
+    )
     signals: list[SignalOut] = Field(default_factory=list)
     override_reason: str | None = None
     overridden_by: str | None = None

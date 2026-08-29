@@ -115,6 +115,10 @@ class NextAction(str, Enum):
     MANAGER_INTRODUCTION = "MANAGER_INTRODUCTION"
     SCHEDULE_CONVERSATION = "SCHEDULE_CONVERSATION"
     ESCALATE = "ESCALATE"
+    # A concern the recruiter has already acted on and the candidate is
+    # working through. Without this the model had no way to say "handled,
+    # check back" and would recommend repeating what was already sent.
+    MONITOR = "MONITOR"
     NO_ACTION = "NO_ACTION"
 
     @property
@@ -126,6 +130,7 @@ class NextAction(str, Enum):
             "MANAGER_INTRODUCTION": "Introduce hiring manager",
             "SCHEDULE_CONVERSATION": "Schedule a conversation",
             "ESCALATE": "Escalate to HR lead",
+            "MONITOR": "Monitor - follow up to confirm",
             "NO_ACTION": "No action needed",
         }[self.value]
 

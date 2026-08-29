@@ -112,6 +112,7 @@ def _risk_view(
     candidate: Candidate,
     analysis: AIAnalysisRecord | None,
     factors: list[str],
+    confidence_factors: list[str] | None = None,
 ) -> RiskView:
     """Risk as the UI renders it, with provenance always attached.
 
@@ -125,6 +126,7 @@ def _risk_view(
         source=source,
         rationale=(analysis.risk_rationale if analysis else "") or "",
         factors=factors,
+        confidence_factors=confidence_factors or [],
         signals=[SignalOut(type=s.type, evidence=s.evidence) for s in _signals_from_analysis(analysis)],
         override_reason=candidate.risk_override_reason,
         overridden_by=candidate.risk_overridden_by,
@@ -141,6 +143,7 @@ def to_summary(
     factors: list[str],
     next_stage_label: str | None,
     today: date,
+    confidence_factors: list[str] | None = None,
 ) -> CandidateSummary:
     next_action = NextAction(analysis.next_action) if analysis else NextAction.NO_ACTION
     return CandidateSummary(
@@ -156,7 +159,7 @@ def to_summary(
         recruiter_name=candidate.recruiter.name if candidate.recruiter else None,
         last_interaction_at=candidate.last_interaction_at,
         days_since_interaction=context.days_since_interaction(today),
-        risk=_risk_view(candidate, analysis, factors),
+        risk=_risk_view(candidate, analysis, factors, confidence_factors),
         next_action=next_action,
         next_action_label=next_action.label,
         # The dashboard shows the top few reasons inline; the detail page shows
@@ -179,6 +182,7 @@ def to_detail(
     factors: list[str],
     next_stage_label: str | None,
     today: date,
+    confidence_factors: list[str] | None = None,
 ) -> CandidateDetail:
     summary = to_summary(
         candidate,
@@ -187,6 +191,7 @@ def to_detail(
         factors=factors,
         next_stage_label=next_stage_label,
         today=today,
+        confidence_factors=confidence_factors,
     )
 
     stages = [
@@ -506,10 +511,19 @@ async def assemble_detail(
         open_follow_up_rules=open_follow_ups.get(candidate.id, frozenset()),
     )
 
+    # Only the detail page shows the derivation; computing it for every row
+    # of a 60-row table would be wasted work nobody reads.
+    from app.domain.confidence import explain_confidence
+
+    breakdown = explain_confidence(
+        context, level=RiskLevel(candidate.risk_level), today=today
+    )
+
     return to_detail(
         candidate,
         context=context,
         analysis=analysis,
+        confidence_factors=breakdown.factors,
         # The detail page shows every factor, not just the top three.
         factors=risk.explain(context, today=today),
         next_stage_label=next_labels.get(candidate.id),
