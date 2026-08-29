@@ -118,6 +118,12 @@ export const api = {
 
   candidate: (id: string) => request<CandidateDetail>(`/candidates/${id}`),
 
+  updateCandidate: (id: string, patch: Record<string, unknown>) =>
+    request<CandidateDetail>(`/candidates/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+
   roles: () => request<string[]>(`/candidates/roles`),
 
   recruiters: () => request<Recruiter[]>(`/recruiters`),

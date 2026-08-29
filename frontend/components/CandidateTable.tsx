@@ -40,6 +40,10 @@ export function CandidateTable() {
   });
 
   const { data: roles } = useQuery({ queryKey: ["roles"], queryFn: api.roles });
+  const { data: recruiters } = useQuery({
+    queryKey: ["recruiters"],
+    queryFn: api.recruiters,
+  });
 
   // Any filter change resets to the first page: leaving the offset in place
   // silently shows an empty table when the new result set is shorter.
@@ -83,6 +87,18 @@ export function CandidateTable() {
         </select>
         <select
           className={select}
+          value={filters.recruiter_id ?? ""}
+          onChange={(e) => update({ recruiter_id: e.target.value })}
+        >
+          <option value="">Any recruiter</option>
+          {(recruiters ?? []).map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className={select}
           value={filters.risk_level ?? ""}
           onChange={(e) =>
             update({ risk_level: (e.target.value || undefined) as RiskLevel })
@@ -116,6 +132,7 @@ export function CandidateTable() {
             <tr>
               <th className="px-5 py-2.5 font-medium">Candidate</th>
               <th className="px-3 py-2.5 font-medium">Joining</th>
+              <th className="px-3 py-2.5 font-medium">Last contact</th>
               <th className="px-3 py-2.5 font-medium">Risk</th>
               {/* The brief requires risk, why, and next action visible on the
                   list itself - not one click away. */}
@@ -145,6 +162,25 @@ export function CandidateTable() {
                       : `${c.days_to_joining} days`}
                   </div>
                   <div className="text-xs text-slate-500">{c.joining_date}</div>
+                </td>
+                <td className="whitespace-nowrap px-3 py-3">
+                  {/* Silence is what the automation rules key on, so it
+                      belongs on the row rather than one click away. */}
+                  {c.days_since_interaction === null ? (
+                    <span className="text-amber-700">never</span>
+                  ) : (
+                    <div
+                      className={
+                        c.days_since_interaction >= 5
+                          ? "text-amber-700"
+                          : "text-slate-700"
+                      }
+                    >
+                      {c.days_since_interaction === 0
+                        ? "today"
+                        : `${c.days_since_interaction}d ago`}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-3">
                   <RiskBadge

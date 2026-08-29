@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Conversation } from "@/components/Conversation";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { MessageComposer } from "@/components/MessageComposer";
+import { NotesPanel } from "@/components/NotesPanel";
 import { RiskPanel } from "@/components/RiskPanel";
 
 export default function CandidatePage({
@@ -71,6 +72,8 @@ export default function CandidatePage({
       </div>
 
       <RiskPanel candidate={data} />
+
+      <NotesPanel candidate={data} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <JourneyTimeline candidate={data} />
