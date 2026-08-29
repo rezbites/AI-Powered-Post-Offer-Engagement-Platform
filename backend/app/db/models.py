@@ -293,6 +293,16 @@ class AIAnalysisRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     prompt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="v1")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=AnalysisStatus.VALID.value)
+    # What the model claimed about its own certainty. Stored but never
+    # displayed: self-reported LLM confidence is poorly calibrated. Kept so
+    # the gap against our derived confidence is measurable.
+    model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # The band the model proposed. `risk_level` above holds the authoritative
+    # blended band; this is kept so model/engine disagreement is measurable.
+    model_risk_level: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Signals discarded by the grounding guardrail. A rising rate means the
+    # model has started inventing quotes.
+    dropped_signals: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)

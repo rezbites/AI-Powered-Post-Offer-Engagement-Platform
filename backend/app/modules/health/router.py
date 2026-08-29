@@ -32,6 +32,14 @@ async def health_ready(response: Response) -> dict[str, object]:
     load balancers stop routing here, rather than serving broken responses."""
     db_ok = await ping_database()
 
+    # Provider health is reported but does NOT gate readiness: an LLM outage
+    # degrades analyses to a deterministic fallback, it does not stop the
+    # service answering requests.
+    from app.ai.factory import get_provider
+
+    provider = get_provider()
+    provider_ok = await provider.healthy()
+
     if not db_ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
@@ -39,6 +47,7 @@ async def health_ready(response: Response) -> dict[str, object]:
         "status": "ready" if db_ok else "degraded",
         "checks": {
             "database": "ok" if db_ok else "unavailable",
+            "llm_provider": "ok" if provider_ok else "degraded",
         },
         # Named explicitly so nobody has to guess whether analyses are real.
         "provider": settings.resolved_provider,
