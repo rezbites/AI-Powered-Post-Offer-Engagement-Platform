@@ -35,6 +35,63 @@ make reset                              # wipe, migrate, reseed
 
 ---
 
+## How it works
+
+```
+  RECRUITER
+      |
+      v
+  +------------------------------------------------------------------+
+  |  NEXT.JS  ·  localhost:3000                                       |
+  |  Attention queue -> Candidate detail -> Analytics                 |
+  +------------------------------------------------------------------+
+      |  REST  /api/v1
+      v
+  +------------------------------------------------------------------+
+  |  FASTAPI  ·  localhost:8000                                       |
+  |                                                                   |
+  |   MODULES        candidates · engagement · analytics              |
+  |                  automation · attention · ai · auth · audit       |
+  |                            |                                      |
+  |   DOMAIN         risk engine · confidence · queue ranking         |
+  |   (pure, no I/O) rule predicates          <- fully unit-tested    |
+  |                            |                                      |
+  |   AI PIPELINE    snapshot -> hash -> cache -> generate            |
+  |                  -> validate -> repair -> fallback -> guardrails  |
+  |                            |                                      |
+  |   SCHEDULER      hourly sweep -> idempotent follow-ups            |
+  +------------------------------------------------------------------+
+      |                                    |
+      v                                    v
+  +-------------------+     +--------------------------------------+
+  |  POSTGRESQL 16    |     |  LLM PROVIDER  (swappable per call)  |
+  |  12 tables        |     |  Claude · Gemini · deterministic mock|
+  +-------------------+     +--------------------------------------+
+```
+
+**The one-paragraph version.** A recruiter opens the dashboard and sees a
+ranked queue of who needs attention. Each candidate carries a risk band, the
+reasons behind it, and a recommended action. The risk band is computed by a
+deterministic engine from countable facts — days to joining, days of silence,
+overdue steps — *blended with* typed signals an LLM extracted from what the
+candidate actually wrote, each backed by a verbatim quote. The model never
+picks the band; it only reads language. A recruiter can override any judgement,
+with a reason, and that override is never overwritten. Meanwhile an hourly job
+flags candidates who are joining soon and have gone quiet, drafts them a
+message, and raises a follow-up task — once, no matter how often it runs.
+
+### The five ideas worth understanding
+
+| Idea | Why it exists |
+|---|---|
+| **Hybrid risk** | Rules are auditable but cannot read *"still figuring out relocation"*. Models read language but cannot be audited. Each does what it is good at. |
+| **Confidence ≠ risk** | How likely someone is to drop out, and how much evidence backs that call, are different questions. HIGH risk at 45% confidence is a real and useful state. |
+| **Grounded signals** | Every concern cites a verbatim quote. If the quote is not in the candidate's own messages, the signal is dropped. This is what stops confident-sounding fiction. |
+| **Human always wins** | Overrides are recorded with actor, reason and certainty, and no later analysis overwrites them. |
+| **Degrade, never break** | Model outage → deterministic fallback. No API key → labelled Demo Mode. The dashboard never 500s because an LLM had a bad day. |
+
+---
+
 ## Demo Mode
 
 **The application runs with no API key.** With no provider key set, a
@@ -607,6 +664,9 @@ primary.
 ---
 
 ## Testing
+
+See [`DEMO.md`](DEMO.md) for a walkthrough script and the questions this
+design invites.
 
 ```bash
 docker compose run --rm api pytest -q   # 198 tests: 166 unit + 32 integration

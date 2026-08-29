@@ -1,5 +1,11 @@
-# Convenience wrappers. Everything runs inside containers, so no local Python
-# installation is required (the host here has 3.9; the code targets 3.12).
+# Shortcuts for the docker commands below - nothing more.
+#
+# `make seed` just runs:
+#     docker compose run --rm api python -m app.db.seed
+#
+# If `make` is not installed (common on Windows), copy the command under any
+# target and run it directly. Everything runs inside containers, so no local
+# Python is needed - the host here has 3.9 and the code targets 3.12.
 .PHONY: help up down build logs seed reset migrate revision test eval eval-live shell psql
 
 help:
