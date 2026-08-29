@@ -133,46 +133,31 @@ microservices — at this size the coordination cost buys nothing.
 
 ```mermaid
 flowchart TB
-    R([Recruiter])
-    subgraph Web["Next.js 15 · App Router"]
-        Q[Attention queue]
-        D[Candidate detail]
-        A[Analytics]
-    end
-    subgraph API["FastAPI"]
-        direction TB
-        subgraph Modules
-            C[candidates]
-            E[engagement]
-            AN[analytics]
-            AU[automation]
-            AT[attention]
-        end
-        subgraph Domain["domain/ · pure, no I/O"]
-            RISK[risk engine]
-            CONF[confidence]
-            RANK[queue ranking]
-            RULES[rule predicates]
-        end
-        subgraph AI["ai/"]
-            PIPE[pipeline]
-            PORT[provider port]
-        end
-        SCHED[[APScheduler]]
-    end
-    PG[(PostgreSQL 16)]
-    CLA[Claude API]
-    GEM[Gemini API]
-    MOCK[Mock provider]
+    R["Recruiter"]
+    WEB["Next.js frontend<br/>queue · detail · analytics"]
+    API["FastAPI"]
+    MOD["Modules<br/>candidates · engagement · analytics<br/>automation · attention · ai · auth"]
+    DOM["Domain layer<br/>risk · confidence · ranking · rules<br/>pure functions, no I/O"]
+    AIP["AI pipeline<br/>snapshot · validate · repair · fallback"]
+    PORT["Provider port"]
+    SCHED["Scheduler<br/>hourly sweep"]
+    PG["PostgreSQL 16"]
+    CLA["Claude API"]
+    GEM["Gemini API"]
+    MOCK["Deterministic mock"]
 
-    R --> Web -->|REST /api/v1| API
-    Modules --> Domain
-    Modules --> AI
+    R --> WEB
+    WEB -->|"REST"| API
+    API --> MOD
+    MOD --> DOM
+    MOD --> AIP
+    AIP --> PORT
     PORT --> CLA
     PORT --> GEM
     PORT --> MOCK
-    API --> PG
-    SCHED --> AU
+    API --> SCHED
+    MOD --> PG
+    AIP --> PG
 ```
 
 **Layering.** Routers do HTTP only. Services own transactions and orchestration.
@@ -246,27 +231,43 @@ It also keeps the SQLite fallback usable when Docker is unavailable.
 
 ```mermaid
 flowchart TD
-    S[Candidate + interactions] --> SNAP[Canonical snapshot]
-    SNAP --> HASH[SHA-256 input hash]
-    HASH --> CACHE{Cached?}
-    CACHE -->|hit| DONE[Return stored analysis]
-    CACHE -->|miss| GEN[Provider · schema-forced generation]
-    GEN --> VAL{Pydantic validates?}
-    VAL -->|yes| GUARD[Guardrails]
-    VAL -->|no| REPAIR[Repair · feed error back]
-    REPAIR --> VAL2{Valid?}
-    VAL2 -->|yes| GUARD
-    VAL2 -->|no| FB[Deterministic fallback<br/>rules-only, no signals]
-    GUARD --> GROUND{Quote in candidate's<br/>own messages?}
-    GROUND -->|yes| KEEP[Keep signal]
-    GROUND -->|no| DROP[Drop · count it]
-    KEEP --> BLEND[Risk engine blends<br/>signals + timing + silence]
+    S["Candidate and interactions"]
+    SNAP["Canonical snapshot"]
+    HASH["SHA-256 input hash"]
+    CACHE{"Already analysed<br/>this exact state?"}
+    DONE["Return stored analysis"]
+    GEN["Provider call<br/>schema-forced"]
+    VAL{"Passes Pydantic<br/>validation?"}
+    REPAIR["Repair<br/>feed the error back"]
+    VAL2{"Valid now?"}
+    FB["Deterministic fallback<br/>rules only, no signals"]
+    GROUND{"Is the quote in the<br/>candidate's own messages?"}
+    KEEP["Keep signal"]
+    DROP["Drop it and count it"]
+    BLEND["Risk engine blends<br/>signals with timing and silence"]
+    PERSIST["Persist with telemetry"]
+    REC["Recruiter reviews"]
+    OVR["Accept or override"]
+
+    S --> SNAP
+    SNAP --> HASH
+    HASH --> CACHE
+    CACHE -->|"hit"| DONE
+    CACHE -->|"miss"| GEN
+    GEN --> VAL
+    VAL -->|"yes"| GROUND
+    VAL -->|"no"| REPAIR
+    REPAIR --> VAL2
+    VAL2 -->|"yes"| GROUND
+    VAL2 -->|"no"| FB
+    GROUND -->|"yes"| KEEP
+    GROUND -->|"no"| DROP
+    KEEP --> BLEND
     DROP --> BLEND
-    FB --> PERSIST[(Persist + telemetry)]
+    FB --> PERSIST
     BLEND --> PERSIST
-    PERSIST --> REC([Recruiter])
-    REC --> ACC[Accept]
-    REC --> OVR[Override]
+    PERSIST --> REC
+    REC --> OVR
 ```
 
 ### The response contract
@@ -439,19 +440,23 @@ make the override feature a lie.
 
 ```mermaid
 flowchart LR
-    T[[Scheduler tick<br/>hourly]] --> LOCK{Advisory lock<br/>acquired?}
-    LOCK -->|no| SKIP[Skip · another replica has it]
-    LOCK -->|yes| SCAN[Load active candidates<br/>within 120-day horizon]
-    SCAN --> CTX[Build pure contexts]
-    CTX --> PRED{Rule predicate}
-    PRED -->|false| NEXT[Next candidate]
-    PRED -->|true| BUCKET[Compute dedupe bucket]
-    BUCKET --> INS{Insert follow-up<br/>unique constraint}
-    INS -->|new| CREATE[Created · draft message if urgent]
-    INS -->|conflict| DEDUP[Skipped · already raised]
-    CREATE --> QUEUE[Attention queue]
-    DEDUP --> NEXT
-    CREATE --> LOG[(automation_runs)]
+    A["Offer Accepted<br/>SLA day 0"]
+    B["Welcome<br/>day 2"]
+    C["Documentation<br/>day 10"]
+    D["Manager Introduction<br/>day 20"]
+    E["Pre-Joining Check-in<br/>day 35"]
+    F["Joining<br/>day 45"]
+    OD["Stage past its SLA"]
+    FU["Follow-up raised"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    C -.-> OD
+    D -.-> OD
+    OD --> FU
 ```
 
 Four rules, each a pure predicate over a `CandidateContext`:
@@ -494,19 +499,33 @@ created, because the task is what actually gets the candidate contacted.
 
 ```mermaid
 flowchart LR
-    A[Offer Accepted<br/><i>SLA day 0</i>] --> B[Welcome<br/><i>day 2</i>]
-    B --> C[Documentation<br/><i>day 10</i>]
-    C --> D[Manager Introduction<br/><i>day 20</i>]
-    D --> E[Pre-Joining Check-in<br/><i>day 35</i>]
-    E --> F[Joining<br/><i>day 45</i>]
+    T["Scheduler tick<br/>hourly"]
+    LOCK{"Advisory lock<br/>acquired?"}
+    SKIP["Skip - another replica has it"]
+    SCAN["Load active candidates"]
+    CTX["Build pure contexts"]
+    PRED{"Rule predicate<br/>matches?"}
+    NEXT["Next candidate"]
+    BUCKET["Compute dedupe bucket"]
+    INS{"Insert follow-up<br/>unique constraint"}
+    CREATE["Created - draft a message if urgent"]
+    DEDUP["Skipped - already raised"]
+    QUEUE["Attention queue"]
+    LOG["automation_runs log"]
 
-    C -.->|past SLA| OD([stage_overdue fires])
-    D -.->|past SLA| OD
-    OD --> FU[[Follow-up raised]]
-
-    style A fill:#d1fae5
-    style F fill:#d1fae5
-    style OD fill:#fef3c7
+    T --> LOCK
+    LOCK -->|"no"| SKIP
+    LOCK -->|"yes"| SCAN
+    SCAN --> CTX
+    CTX --> PRED
+    PRED -->|"no"| NEXT
+    PRED -->|"yes"| BUCKET
+    BUCKET --> INS
+    INS -->|"new"| CREATE
+    INS -->|"conflict"| DEDUP
+    CREATE --> QUEUE
+    DEDUP --> NEXT
+    CREATE --> LOG
 ```
 
 SLAs are days from the **offer date**, frozen onto each `candidate_stages` row
@@ -592,31 +611,39 @@ grow without bound and queries are almost always recent-window.
 
 ```mermaid
 flowchart TB
-    LB[Load balancer] --> API1[API replica]
-    LB --> API2[API replica]
-    LB --> API3[API replica]
+    LB["Load balancer"]
+    API1["API replica"]
+    API2["API replica"]
+    PRIM["Primary database<br/>writes"]
+    RR["Read replicas<br/>dashboard reads"]
+    Q["Job queue<br/>Redis or SQS"]
+    W1["AI worker"]
+    W2["AI worker"]
+    LLM["Provider<br/>global rate limit"]
+    SCHED["External scheduler<br/>CronJob"]
+    ROLL["Nightly rollup job"]
+    AGG["Aggregate tables<br/>per day, recruiter, stage"]
+    COL["Columnar store<br/>LLM ledger"]
 
-    API1 & API2 & API3 --> PRIM[(Primary<br/>writes)]
-    API1 & API2 & API3 --> RR[(Read replicas<br/>dashboard reads)]
-    PRIM -.->|streaming| RR
-
-    API1 & API2 & API3 -->|enqueue| Q[[Job queue<br/>Redis / SQS]]
-    Q --> W1[AI worker]
-    Q --> W2[AI worker]
-    W1 & W2 --> LLM[Provider<br/>global rate limit]
-    W1 & W2 --> PRIM
-
-    SCHED[[External scheduler<br/>CronJob]] -->|dispatch| Q
-
-    PRIM --> ROLL[Nightly rollup job]
-    ROLL --> AGG[(Aggregate tables<br/>per day / recruiter / stage)]
+    LB --> API1
+    LB --> API2
+    API1 --> PRIM
+    API2 --> PRIM
+    API1 --> RR
+    API2 --> RR
+    PRIM -.->|"streaming"| RR
+    API1 --> Q
+    API2 --> Q
+    SCHED --> Q
+    Q --> W1
+    Q --> W2
+    W1 --> LLM
+    W2 --> LLM
+    W1 --> PRIM
+    PRIM --> ROLL
+    ROLL --> AGG
     RR --> AGG
-
-    PRIM -.->|CDC| COL[(Columnar store<br/>LLM ledger)]
-
-    style Q fill:#e0e7ff
-    style AGG fill:#d1fae5
-    style SCHED fill:#fef3c7
+    PRIM -.->|"CDC"| COL
 ```
 
 Four changes carry most of the weight: **AI moves behind a queue** so request
