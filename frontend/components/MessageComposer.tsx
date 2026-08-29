@@ -17,6 +17,10 @@ import type { GeneratedMessage } from "@/types/api";
 export function MessageComposer({ candidateId }: { candidateId: string }) {
   const qc = useQueryClient();
   const [warnings, setWarnings] = useState<string[]>([]);
+  // Which draft is being edited, and its working copy.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftSubject, setDraftSubject] = useState<string | null>(null);
+  const [draftBody, setDraftBody] = useState("");
 
   const { data: messages } = useQuery({
     queryKey: ["messages", candidateId],
@@ -28,6 +32,14 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
       api.draftMessage(candidateId, channel),
     onSuccess: (msg: GeneratedMessage) => {
       setWarnings(msg.warnings ?? []);
+      qc.invalidateQueries({ queryKey: ["messages", candidateId] });
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: () => api.editMessage(editingId!, draftSubject, draftBody),
+    onSuccess: () => {
+      setEditingId(null);
       qc.invalidateQueries({ queryKey: ["messages", candidateId] });
     },
   });
@@ -104,28 +116,84 @@ export function MessageComposer({ candidateId }: { candidateId: string }) {
                     mock fixture
                   </span>
                 )}
+                {m.tone === "human_edited" && (
+                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-800">
+                    edited by you
+                  </span>
+                )}
                 <span className="text-slate-400">
                   {new Date(m.created_at).toLocaleString("en-GB")}
                 </span>
               </div>
 
-              {m.subject && (
-                <p className="mt-2 text-sm font-medium text-slate-900">
-                  {m.subject}
-                </p>
-              )}
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                {m.body}
-              </p>
+              {editingId === m.id ? (
+                <div className="mt-2">
+                  {/* Editable before approval. A recruiter who cannot adjust
+                      the wording pastes it into their own mail client, and the
+                      approval trail disappears entirely. */}
+                  {m.channel === "email" && (
+                    <input
+                      className="mb-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      value={draftSubject ?? ""}
+                      onChange={(e) => setDraftSubject(e.target.value)}
+                      placeholder="Subject"
+                    />
+                  )}
+                  <textarea
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    rows={8}
+                    value={draftBody}
+                    onChange={(e) => setDraftBody(e.target.value)}
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => save.mutate()}
+                      disabled={!draftBody.trim() || save.isPending}
+                      className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                    >
+                      {save.isPending ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {m.subject && (
+                    <p className="mt-2 text-sm font-medium text-slate-900">
+                      {m.subject}
+                    </p>
+                  )}
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                    {m.body}
+                  </p>
 
-              {m.status === "draft" && (
-                <button
-                  onClick={() => approve.mutate(m.id)}
-                  disabled={approve.isPending}
-                  className="mt-3 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                >
-                  Approve &amp; send (simulated)
-                </button>
+                  {m.status === "draft" && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingId(m.id);
+                          setDraftSubject(m.subject);
+                          setDraftBody(m.body);
+                        }}
+                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => approve.mutate(m.id)}
+                        disabled={approve.isPending}
+                        className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Approve &amp; send (simulated)
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </li>
           ))}

@@ -19,7 +19,7 @@ from app.ai.factory import get_provider
 from app.ai.provider import ProviderUnavailable
 from app.ai.snapshot import CandidateSnapshot, build_snapshot
 from app.core.deps import Actor
-from app.core.errors import NotFoundError, ProviderError
+from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.db.models import AIAnalysisRecord, Candidate, GeneratedMessage
@@ -334,6 +334,58 @@ async def generate_message(
         warnings=len(warnings),
     )
     return message, warnings
+
+
+async def update_message(
+    session: AsyncSession,
+    message_id: str,
+    *,
+    subject: str | None,
+    body: str,
+    actor: Actor,
+) -> GeneratedMessage:
+    """Edit a draft before approving it.
+
+    Recruiters know their candidates better than the model does, and a draft
+    they cannot adjust is one they will copy into their own mail client -
+    which loses the approval trail entirely. Editing is therefore part of the
+    human-in-the-loop flow, not a workaround for it.
+
+    Only drafts are editable. Rewriting an already-approved message would make
+    the audit record describe something other than what was sent.
+    """
+    message = await session.get(GeneratedMessage, message_id)
+    if message is None:
+        raise NotFoundError("Message not found.", details={"message_id": message_id})
+
+    if message.status != MessageStatus.DRAFT.value:
+        raise ConflictError(
+            "Only drafts can be edited. This message has already been approved.",
+            details={"status": message.status},
+        )
+
+    if not body.strip():
+        raise ValidationError("Message body cannot be empty.")
+
+    before = audit.snapshot_of(message, ["subject", "body"])
+    message.subject = subject
+    message.body = body.strip()
+    # Provenance: once a human edits the text, it is no longer purely model
+    # output and must not be presented as such.
+    message.tone = "human_edited"
+
+    await audit.record_change(
+        session,
+        actor=actor,
+        entity=message,
+        entity_type="generated_message",
+        action=AuditAction.UPDATE,
+        tracked_fields=["subject", "body", "tone"],
+        before_snapshot=before,
+    )
+    await session.commit()
+    await session.refresh(message)
+    return message
 
 
 async def approve_message(

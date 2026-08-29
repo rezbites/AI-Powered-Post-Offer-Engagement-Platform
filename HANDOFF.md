@@ -23,6 +23,8 @@ Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 | 9 Auth | ✅ verified | login, RBAC 401/403/200, no user enumeration, rate limit 20/min |
 | Live Mode | ✅ verified | real Gemini call: valid, 4.7s, 1019/210 tokens, both signals with exact quotes |
 | Add candidate | ✅ verified | form + `GET /recruiters`; 422 on bad dates, 409 on duplicate email |
+| Log interaction | ✅ verified | inline form on the detail page; back-dating supported |
+| Edit draft | ✅ verified | `PATCH /ai/messages/{id}`; drafts only, marked `human_edited` |
 | 10 Eval + tests | ❌ not started | see §4 |
 | 11 Docs | 🟡 **README done**, 2 of 6 diagrams | see §5 |
 | 12 Critical review | ❌ not started | see §6 |
@@ -271,6 +273,28 @@ Both quotes are exact spans of the candidate's messages, so the grounding
 guardrail passed with zero drops. Note the latency contrast worth mentioning in
 a demo: ~4700 ms live versus ~1 ms mock, which is precisely why the
 `input_hash` cache exists.
+
+---
+
+## 5c. Full loop verified on live Gemini
+
+New candidate → log conversation → analyse:
+
+```
+created                risk LOW · confidence 0.13 · source rule
+logged 2 interactions  (1 outbound, 1 inbound)
+analysed               gemini · valid · 6350 ms · 927/203 tokens
+  RISK: HIGH  conf 0.40   model said MEDIUM · agreed False
+  notice_period_issue -> "my current employer is not releasing me on time…"
+  relocation_concern  -> "Also still sorting out a place to stay in Pune."
+  NEXT: Call candidate
+```
+
+Two things worth demoing from this. Gemini pulled **two distinct signals from
+one sentence**, both with exact quotes. And confidence fell to 0.40 *because*
+the model and the engine disagreed on the band — that is the derived-confidence
+mechanism doing precisely what it was built for, and it is only visible because
+both numbers are stored.
 
 ---
 

@@ -275,6 +275,32 @@ async def create_candidate(
 
     await engagement.assign_default_journey(session, candidate)
 
+    # Run the deterministic engine immediately. Without this a new candidate
+    # sits at confidence 0.0, which the UI would render as "0% confident" -
+    # implying a assessed judgement rather than the truth, which is that
+    # nothing has assessed them yet.
+    stage_count = len(
+        (await engagement.get_default_template(session)).stages
+    )
+    initial_ctx = CandidateContext(
+        candidate_id=candidate.id,
+        name=candidate.name,
+        status=CandidateStatus(candidate.status),
+        joining_date=candidate.joining_date,
+        offer_date=candidate.offer_date,
+        last_interaction_at=None,
+        unanswered_outbound=0,
+        total_interactions=0,
+        inbound_interactions=0,
+        stages_total=stage_count,
+        stages_completed=0,
+        stages_overdue=0,
+    )
+    assessment = risk.assess(initial_ctx, today=date.today())
+    if assessment is not None:
+        candidate.risk_level = assessment.level.value
+        candidate.risk_confidence = assessment.confidence
+
     await audit.record(
         session,
         actor=actor,

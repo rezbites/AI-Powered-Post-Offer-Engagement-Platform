@@ -57,9 +57,17 @@ export function RiskPanel({ candidate }: { candidate: CandidateDetail }) {
     <section className="rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
         <div className="flex items-center gap-3">
-          <RiskBadge level={risk.level} confidence={risk.confidence} />
+          <RiskBadge
+            level={risk.level}
+            confidence={risk.confidence > 0 ? risk.confidence : undefined}
+          />
+          {/* 0.0 means "nothing has assessed this candidate yet", which is a
+              different statement from "assessed, with zero confidence".
+              Rendering both as 0% would misrepresent the first. */}
           <span className="text-xs text-slate-500">
-            {Math.round(risk.confidence * 100)}% confidence (heuristic)
+            {risk.confidence > 0
+              ? `${Math.round(risk.confidence * 100)}% confidence (heuristic)`
+              : "not yet assessed"}
           </span>
         </div>
 

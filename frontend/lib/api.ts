@@ -154,6 +154,12 @@ export const api = {
   messages: (id: string) =>
     request<GeneratedMessage[]>(`/candidates/${id}/ai/messages`),
 
+  editMessage: (messageId: string, subject: string | null, body: string) =>
+    request<GeneratedMessage>(`/ai/messages/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subject, body }),
+    }),
+
   approveMessage: (messageId: string) =>
     request<GeneratedMessage>(`/ai/messages/${messageId}/approve`, {
       method: "POST",
@@ -161,7 +167,12 @@ export const api = {
 
   addInteraction: (
     id: string,
-    payload: { channel: string; direction: string; content: string },
+    payload: {
+      channel: string;
+      direction: string;
+      content: string;
+      occurred_at?: string;
+    },
   ) =>
     request<Interaction>(`/candidates/${id}/interactions`, {
       method: "POST",

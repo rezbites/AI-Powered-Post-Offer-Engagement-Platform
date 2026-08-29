@@ -236,6 +236,42 @@ async def list_messages(session: SessionDep, candidate_id: str) -> list[MessageR
     ]
 
 
+class MessageEdit(BaseModel):
+    subject: str | None = Field(default=None, max_length=200)
+    body: str = Field(min_length=1, max_length=5000)
+
+
+@router.patch(
+    "/ai/messages/{message_id}",
+    response_model=MessageResponse,
+    summary="Edit a draft before approving it",
+)
+async def edit_message(
+    session: SessionDep, actor: ActorDep, message_id: str, payload: MessageEdit
+) -> MessageResponse:
+    """Drafts are editable; approved messages are not.
+
+    A recruiter who cannot adjust the wording will paste it into their own mail
+    client instead, and the approval trail disappears.
+    """
+    message = await service.update_message(
+        session, message_id, subject=payload.subject, body=payload.body, actor=actor
+    )
+    return MessageResponse(
+        id=message.id,
+        candidate_id=message.candidate_id,
+        channel=message.channel,
+        subject=message.subject,
+        body=message.body,
+        tone=message.tone,
+        status=MessageStatus(message.status),
+        provider=message.provider,
+        mode="demo" if message.provider == "mock" else "live",
+        model=message.model,
+        created_at=message.created_at,
+    )
+
+
 @router.post(
     "/ai/messages/{message_id}/approve",
     response_model=MessageResponse,
