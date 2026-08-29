@@ -1,6 +1,6 @@
 # Convenience wrappers. Everything runs inside containers, so no local Python
 # installation is required (the host here has 3.9; the code targets 3.12).
-.PHONY: help up down build logs seed reset migrate revision test lint shell psql
+.PHONY: help up down build logs seed reset migrate revision test eval eval-live shell psql
 
 help:
 	@echo "up        Start the full stack (db + api + web)"
@@ -12,6 +12,8 @@ help:
 	@echo "seed      Populate demo data (60 candidates)"
 	@echo "reset     Drop volumes, rebuild, migrate and reseed from scratch"
 	@echo "test      Run the backend test suite"
+	@echo "eval      Score AI extraction against the golden set (mock, free)"
+	@echo "eval-live Compare mock vs Gemini (uses real tokens)"
 	@echo "shell     Shell into the API container"
 	@echo "psql      Open a psql prompt against the dev database"
 
@@ -46,6 +48,14 @@ reset:
 
 test:
 	docker compose run --rm api pytest -v
+
+# Deterministic and free - safe to run in CI.
+eval:
+	docker compose run --rm api python -m evals.run_eval --verbose
+
+# Costs real tokens. Compares both providers on the same golden set.
+eval-live:
+	docker compose run --rm api python -m evals.run_eval --compare --verbose
 
 shell:
 	docker compose run --rm api sh

@@ -37,6 +37,12 @@ from app.domain.enums import NextAction, RiskLevel, SignalType
 
 # Bumped whenever a prompt changes in a way that could alter output. Stamped on
 # every stored analysis so a regression can be attributed to a specific prompt.
+#
+# v2 exists on disk (prompts/analysis_v2.md) but is NOT active. It was written
+# to test whether v1 under-reports signals, and the comparison run was
+# invalidated by Gemini free-tier quota exhaustion mid-eval - failed calls fall
+# back to a rules-only analysis with zero signals, which reads exactly like
+# poor recall. Re-run `make eval-live` on fresh quota before promoting it.
 PROMPT_VERSION = "v1"
 
 

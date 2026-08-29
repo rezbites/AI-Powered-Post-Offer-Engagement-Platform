@@ -26,7 +26,8 @@ Stages 10 and 12 remain, plus two diagrams, `docs/decisions.md` and screenshots.
 | Log interaction | ✅ verified | inline form on the detail page; back-dating supported |
 | Edit draft | ✅ verified | `PATCH /ai/messages/{id}`; drafts only, marked `human_edited` |
 | Provider toggle | ✅ verified | per-call `?provider=gemini\|mock` on analyse and draft; UI toggle on both panels |
-| 10 Eval + tests | ❌ not started | see §4 |
+| 10 Eval harness | ✅ done | 22-scenario golden set, `make eval`; mock scored |
+| 10 Integration tests | ❌ not started | see §4b |
 | 11 Docs | 🟡 **README done**, 2 of 6 diagrams | see §5 |
 | 12 Critical review | ❌ not started | see §6 |
 
@@ -136,9 +137,44 @@ a login page and apply `AuthedActorDep` to mutating routes, or keep it and make
 sure the README's statement of this stays accurate (it currently says so in
 §5 "What I would improve").
 
-## 4. Stage 10 — Eval harness + integration tests
+## 4. Stage 10 — Eval harness ✅ / integration tests ❌
 
-### 4a. Golden-set eval (highest AI-score value)
+### 4a. Eval harness — DONE
+
+`backend/evals/golden_set.json` (22 labelled scenarios) and
+`backend/evals/run_eval.py`. Run with `make eval` (mock, free) or
+`make eval-live` (compares both providers — **see the quota warning**).
+
+**Mock baseline, 22 scenarios:**
+
+```
+schema valid first pass  100.0%      band exact          72.7%
+repaired / failed        0 / 0       band within one    100.0%
+signal precision          0.88       grounding drops        0
+signal recall             0.94       injection leaks        0
+latency p50/p95        1 / 1 ms      est. cost/1k        $0.10
+```
+
+### ⚠️ Gemini free tier is 20 requests PER DAY
+
+Not per minute — `GenerateRequestsPerDayPerProjectPerModel-FreeTier`,
+`quotaValue: 20`. A full 22-scenario run exhausts it and then some.
+
+**Two live eval runs on 2026-08-29 were invalidated by this.** Calls that hit
+429 exhausted their retries and fell back to the deterministic path, which
+emits zero signals by design — indistinguishable from genuinely poor recall
+unless you check the `failed` count. The reported recall (0.44, then 0.38) is
+an artefact, not a measurement.
+
+The harness now prints a loud warning whenever `failed > 0`, and takes
+`--limit N`. **Use `--limit 8` on the free tier**, or the run is worthless.
+
+`prompts/analysis_v2.md` exists but is **not active** (`PROMPT_VERSION = "v1"`).
+It was written to test whether v1 under-reports signals; the comparison was
+contaminated, so promoting it would be acting on invalid evidence. Re-run on
+fresh quota before deciding.
+
+### 4a-bis. Original spec, for reference
 
 Create `backend/evals/golden_set.json` — ~20–25 labelled scenarios. **Source
 them from `backend/app/db/seed.py::ARCHETYPES`**, which already encodes ten
