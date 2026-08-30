@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.core.deps import SessionDep
 from app.domain.enums import NextAction, RiskLevel
+from app.domain.rules import evaluate
 from app.modules.attention import service
 
 router = APIRouter(tags=["attention"])
@@ -68,10 +69,18 @@ async def attention_queue(
     ranked = await service.build_attention_queue(session, today=today, limit=limit, recruiter_id=recruiter_id)
 
     items = []
-    for item, candidate, analysis in ranked:
-        # Falls back to NO_ACTION when the candidate has not been analysed
-        # yet - the queue still ranks them on deterministic factors alone.
-        action = NextAction(analysis.next_action) if analysis else NextAction.NO_ACTION
+    for item, candidate, ctx, analysis in ranked:
+        if analysis:
+            action = NextAction(analysis.next_action)
+        else:
+            # Never NO_ACTION here. A candidate ranked into this queue is by
+            # definition one that needs attention, and telling a recruiter
+            # 'no action needed' beside a HIGH RISK badge is worse than
+            # saying nothing - it actively contradicts the reason the row
+            # exists. The rules that fired already know what to do, so use
+            # the most urgent of them until an analysis exists.
+            fired = evaluate(ctx, today=today)
+            action = fired[0][1].action if fired else NextAction.CALL_CANDIDATE
 
         items.append(
             AttentionEntry(

@@ -399,7 +399,9 @@ Remaining known weaknesses, all documented rather than hidden:
 2. **`pip --prefix=/install` leaves site-packages off `sys.path`.** The
    Dockerfile copies into `/usr/local`. Do not "tidy" this.
 3. **Lazy relationship access in async context → `MissingGreenlet`.** Always
-   `selectinload` or pass data through explicitly. Bit twice.
+   `selectinload` or pass data through explicitly. **Bit three times** - most
+   recently by reaching for `candidate.analyses[0]` in a router. If you need
+   a relationship, load it in the repository and pass it down the call chain.
 4. **ContextVar reset in `finally` runs before the access log.** Logging must
    happen inside the `try`.
 5. **`func.case` is invalid in SQLAlchemy 2.0** — `case` is top-level.

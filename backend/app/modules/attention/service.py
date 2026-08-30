@@ -105,8 +105,17 @@ async def build_attention_queue(
         (contexts[c.id], RiskLevel(c.risk_level)) for c in candidates if c.id in contexts
     ]
     ranked = attention.build_queue(entries, today=today, limit=limit)
+    # The context travels with each item so callers can derive a sensible
+    # action for candidates the AI has not analysed yet. Analyses are fetched
+    # here rather than lazily off the ORM object - touching an unloaded
+    # relationship in an async context raises MissingGreenlet.
     return [
-        (item, by_id[item.candidate_id], analyses.get(item.candidate_id))
+        (
+            item,
+            by_id[item.candidate_id],
+            contexts[item.candidate_id],
+            analyses.get(item.candidate_id),
+        )
         for item in ranked
     ]
 

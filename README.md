@@ -35,6 +35,65 @@ make reset                              # wipe, migrate, reseed
 
 ---
 
+## The platform
+
+### Dashboard — "who needs attention today?"
+
+![Dashboard with the ranked attention queue](image/01-dashboard.png)
+
+The ranked queue leads, then the filterable table. Every queue entry carries
+the risk band, the reasons behind it, and a recommended action — so a recruiter
+can decide whether to act without opening anything. The ranking is a pure
+function, not an LLM call: a queue that reshuffles between refreshes is one
+recruiters stop trusting.
+
+### Candidate list, with the brief's five filters
+
+![Candidate table with filters](image/02-candidate-table.png)
+
+Joining month, role, recruiter, risk and status. Risk and evidence strength are
+separate columns because they answer different questions. `not assessed` is
+shown rather than a zero, since "nothing has looked at this yet" and "looked,
+found nothing" are different facts.
+
+### Adding a candidate
+
+![Add candidate dialog](image/03-add-candidate.png)
+
+The full six-stage engagement journey is created server-side on save, with each
+stage's due date frozen from its SLA — so a new candidate is immediately
+visible in the funnel and eligible for the automation rules.
+
+### Candidate detail — the explainability panel
+
+![Candidate detail page](image/04-candidate-detail.png)
+
+Risk is never a bare label. **Risk of not joining** and **how well supported**
+are separate readings; `How was 55% arrived at?` expands into the term-by-term
+derivation. Below that: recruiter notes kept deliberately apart from AI output,
+the journey with completed and pending steps, conversation history, and the
+message composer where drafts wait for human approval.
+
+The provider toggle (`Mock · Claude · Gemini`) switches backends per call.
+Gemini is greyed out here because no key is configured — shown disabled rather
+than hidden, so it is clear the option exists and why it cannot be used.
+
+### Analytics
+
+![Analytics dashboard](image/05-analytics.png)
+
+Every metric the brief names. Two deliberate choices visible here: conversion
+counts only *resolved* candidates (49 still pending are excluded, since someone
+joining next month is not a failure yet), and the funnel says **"not here yet"**
+rather than "dropped off" — those candidates are mid-journey, not withdrawn.
+
+The AI operations panel is read straight from the analyses table: schema
+validity, repairs, fallbacks, signals dropped by the grounding guardrail,
+model/engine disagreements, latency and token spend. No separate monitoring
+stack.
+
+---
+
 ## How it works
 
 ```
