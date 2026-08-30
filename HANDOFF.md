@@ -49,7 +49,8 @@ it as exposed and **rotate it** when demoing is done.
 
 ### What remains (nothing blocking)
 
-- **Screenshots or a demo video** — the brief asks; nothing captured.
+- ~~Screenshots or a demo video~~ — **done**. Five screenshots embedded in
+  the README, demo video at https://drive.google.com/drive/folders/1lbQKIuN7wv-p9re2g9E-uU2dNpgXlEyA
 - **Reads are unauthenticated** — RBAC guards only `/audit`. Deliberate demo
   affordance, documented in README §5 and decisions.md §15. Decide before this
   touches real data.
@@ -422,7 +423,7 @@ Remaining known weaknesses, all documented rather than hidden:
 - [ ] Eval harness with a metrics table
 - [ ] Integration tests
 - [ ] `docker compose up` works from a clean clone (`make reset`)
-- [ ] Screenshots or a short demo video (**the brief asks for this**)
+- [x] Screenshots and demo video — both in the README
 - [ ] Repo pushed — `CLAUDE.md` and the `.docx` are gitignored and purged
       from history; keep them out
 - [ ] Deployed URL if available (optional)

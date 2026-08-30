@@ -4,6 +4,8 @@ Helps recruiters engage candidates in the gap between offer acceptance and
 joining: tracks the engagement journey, detects joining risk from what
 candidates actually say, recommends next actions, and automates follow-ups.
 
+**[▶ Watch the demo walkthrough](https://drive.google.com/drive/folders/1lbQKIuN7wv-p9re2g9E-uU2dNpgXlEyA)**
+
 The guiding sentence for every design decision:
 
 > A recruiter opens this every morning and immediately knows **which candidates
@@ -36,6 +38,8 @@ make reset                              # wipe, migrate, reseed
 ---
 
 ## The platform
+
+**[▶ Demo video](https://drive.google.com/drive/folders/1lbQKIuN7wv-p9re2g9E-uU2dNpgXlEyA)** — a walkthrough of everything below.
 
 ### Dashboard — "who needs attention today?"
 
